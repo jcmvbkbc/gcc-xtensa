@@ -1,5 +1,5 @@
 /* Subroutines for insn-output.c for MIPS
-   Copyright (C) 1989, 90, 91, 93-96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1989, 90, 91, 93-97, 1998 Free Software Foundation, Inc.
    Contributed by A. Lichnewsky, lich@inria.inria.fr.
    Changes by Michael Meissner, meissner@osf.org.
    64 bit r4000 support by Ian Lance Taylor, ian@cygnus.com, and
@@ -195,9 +195,9 @@ enum processor_type mips_cpu;
 int mips_isa;
 
 #ifdef MIPS_ABI_DEFAULT
-/* which ABI to use.  This is defined to a constant in mips.h if the target
+/* Which ABI to use.  This is defined to a constant in mips.h if the target
    doesn't support multiple ABIs.  */
-enum mips_abi_type mips_abi;
+int mips_abi;
 #endif
 
 /* Strings to hold which cpu and instruction set architecture to use.  */
@@ -4319,7 +4319,7 @@ mips_output_external (file, decl, name)
 #ifdef ASM_OUTPUT_UNDEF_FUNCTION
   if (TREE_CODE (decl) == FUNCTION_DECL
       /* ??? Don't include alloca, since gcc will always expand it
-	 inline.  If we don't do this, libg++ fails to build.  */
+	 inline.  If we don't do this, the C++ library fails to build.  */
       && strcmp (name, "alloca")
       /* ??? Don't include __builtin_next_arg, because then gcc will not
 	 bootstrap under Irix 5.1.  */
@@ -5506,7 +5506,8 @@ mips_expand_prologue ()
 	}
 
       if (TARGET_ABICALLS && mips_abi != ABI_32)
-	emit_insn (gen_loadgp (XEXP (DECL_RTL (current_function_decl), 0)));
+	emit_insn (gen_loadgp (XEXP (DECL_RTL (current_function_decl), 0),
+			       gen_rtx (REG, DImode, 25)));
     }
 
   /* If we are profiling, make sure no instructions are scheduled before

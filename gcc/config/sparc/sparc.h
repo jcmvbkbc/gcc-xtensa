@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler, for Sun SPARC.
-   Copyright (C) 1987, 88, 89, 92, 94-6, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1987, 88, 89, 92, 94-97, 1998 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com).
    64 bit SPARC V9 support by Michael Tiemann, Jim Wilson, and Doug Evans,
    at Cygnus Support.
@@ -2136,9 +2136,8 @@ extern struct rtx_def *sparc_builtin_saveregs ();
    is defined, then all arguments are treated as named.  Otherwise, all named
    arguments except the last are treated as named.
    For the v9 we want NAMED to mean what it says it means.  */
-/* ??? This needn't be set for v8, but I don't want to make this runtime
-   selectable if I don't have to.  */
-#define STRICT_ARGUMENT_NAMING
+
+#define STRICT_ARGUMENT_NAMING TARGET_V9
 
 /* Generate RTL to flush the register windows so as to make arbitrary frames
    available.  */
@@ -2959,7 +2958,8 @@ do {									\
   ASM_OUTPUT_ALIGN (FILE, sparc_align_jumps)
 
 #define ASM_OUTPUT_LOOP_ALIGN(FILE) \
-  ASM_OUTPUT_ALIGN (FILE, sparc_align_loops)
+  if (sparc_align_loops >= 2)	    \
+    fprintf ((FILE), "\t.align %d, 0x01000000\n", 1 << sparc_align_loops)
 
 #define ASM_OUTPUT_SKIP(FILE,SIZE)  \
   fprintf (FILE, "\t.skip %u\n", (SIZE))

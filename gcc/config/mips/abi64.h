@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler.  64 bit ABI support.
-   Copyright (C) 1994, 1995, 1996 Free Software Foundation, Inc.
+   Copyright (C) 1994, 1995, 1996, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -63,16 +63,10 @@ Boston, MA 02111-1307, USA.  */
 #define MAX_ARGS_IN_REGISTERS	(mips_abi == ABI_32 ? 4 : 8)
 
 #undef REG_PARM_STACK_SPACE
-#if 0
-/* ??? This is necessary in order for the ABI_32 support to work.  However,
-   expr.c (emit_push_insn) has no support for a REG_PARM_STACK_SPACE
-   definition that returns zero.  That would have to be fixed before this
-   can be enabled.  */
 #define REG_PARM_STACK_SPACE(FNDECL) 					 \
   (mips_abi == ABI_32							 \
    ? (MAX_ARGS_IN_REGISTERS*UNITS_PER_WORD) - FIRST_PARM_OFFSET (FNDECL) \
    : 0)
-#endif
 
 #define FUNCTION_ARG_PADDING(MODE, TYPE)				\
   (! BYTES_BIG_ENDIAN							\
@@ -184,8 +178,7 @@ extern struct rtx_def *mips_function_value ();
     }									\
 }
 
-/* ??? Should disable for mips_abi == ABI32.  */
-#define STRICT_ARGUMENT_NAMING
+#define STRICT_ARGUMENT_NAMING (mips_abi != ABI_32)
 
 /* A C expression that indicates when an argument must be passed by
    reference.  If nonzero for an argument, a copy of that argument is
@@ -213,8 +206,24 @@ extern struct rtx_def *mips_function_value ();
   (mips_abi == ABI_EABI && (NAMED)					\
    && FUNCTION_ARG_PASS_BY_REFERENCE (CUM, MODE, TYPE, NAMED))
 
+/* Define LONG_MAX correctly for all users.  We need to handle 32 bit EABI,
+   64 bit EABI, N32, and N64 as possible defaults.  The checks performed here
+   are the same as the checks in override_options in mips.c that determines
+   whether MASK_LONG64 will be set.
+
+   This does not handle inappropriate options or ununusal option
+   combinations.  */
+
 #undef LONG_MAX_SPEC
-#define LONG_MAX_SPEC "%{!mno-long64:-D__LONG_MAX__=9223372036854775807LL}"
+#if ((MIPS_ABI_DEFAULT == ABI_64) || ((MIPS_ABI_DEFAULT == ABI_EABI) && ((TARGET_DEFAULT | TARGET_CPU_DEFAULT) & MASK_64BIT)))
+#define LONG_MAX_SPEC \
+  "%{!mabi=n32:%{!mno-long64:%{!mgp32:-D__LONG_MAX__=9223372036854775807L}}}"
+#else
+#define LONG_MAX_SPEC \
+  "%{mabi=64:-D__LONG_MAX__=9223372036854775807L} \
+   %{mlong64:-D__LONG_MAX__=9223372036854775807L} \
+   %{mgp64:-D__LONG_MAX__=9223372036854775807L}"
+#endif
 
 /* ??? Unimplemented stuff follows.  */
 
