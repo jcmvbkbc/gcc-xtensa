@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -419,10 +419,10 @@ Output of Assembler Instructions
 
      Define the macros `REGISTER_PREFIX', `LOCAL_LABEL_PREFIX',
      `USER_LABEL_PREFIX' and `IMMEDIATE_PREFIX' if you can express the
-     variations in assemble language syntax with that mechanism.  Define
-     `ASSEMBLER_DIALECT' and use the `{option0|option1}' syntax if the
-     syntax variant are larger and involve such things as different
-     opcodes or operand order.
+     variations in assembler language syntax with that mechanism.
+     Define `ASSEMBLER_DIALECT' and use the `{option0|option1}' syntax
+     if the syntax variant are larger and involve such things as
+     different opcodes or operand order.
 
 `ASM_OUTPUT_REG_PUSH (STREAM, REGNO)'
      A C expression to output to STREAM some assembler code which will
@@ -672,10 +672,17 @@ Macros Affecting All Debugging Formats
 
 `PREFERRED_DEBUGGING_TYPE'
      A C expression that returns the type of debugging output GNU CC
-     produces when the user specifies `-g' or `-ggdb'.  Define this if
+     should produce when the user specifies just `-g'.  Define this if
      you have arranged for GNU CC to support more than one format of
      debugging output.  Currently, the allowable values are `DBX_DEBUG',
      `SDB_DEBUG', `DWARF_DEBUG', `DWARF2_DEBUG', and `XCOFF_DEBUG'.
+
+     When the user specifies `-ggdb', GNU CC normally also uses the
+     value of this macro to select the debugging output format, but
+     with two exceptions.  If `DWARF2_DEBUGGING_INFO' is defined and
+     `LINKER_DOES_NOT_WORK_WITH_DWARF2' is not defined, GNU CC uses the
+     value `DWARF2_DEBUG'.  Otherwise, if `DBX_DEBUGGING_INFO' is
+     defined, GNU CC uses `DBX_DEBUG'.
 
      The value of this macro only affects the default debugging output;
      the user can always get a specific type of output by using
@@ -965,6 +972,13 @@ Macros for SDB and DWARF Output
      `RTX_FRAME_RELATED_P' on the prologue insns if you use RTL for the
      prologue, or call `dwarf2out_def_cfa' and `dwarf2out_reg_save' as
      appropriate from `FUNCTION_PROLOGUE' if you don't.
+
+`LINKER_DOES_NOT_WORK_WITH_DWARF2'
+     Define this macro if the linker does not work with Dwarf version 2.
+     Normally, if the user specifies only `-ggdb' GNU CC will use Dwarf
+     version 2 if available; this macro disables this.  See the
+     description of the `PREFERRED_DEBUGGING_TYPE' macro for more
+     details.
 
 `PUT_SDB_...'
      Define these macros to override the assembler syntax for the

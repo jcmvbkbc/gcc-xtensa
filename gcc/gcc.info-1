@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -37,7 +37,7 @@ Introduction
 
    This manual documents how to run, install and port the GNU compiler,
 as well as its new features and incompatibilities, and how to report
-bugs.  It corresponds to GNU CC version 2.8.0.
+bugs.  It corresponds to GNU CC version 2.8.1.
 
 * Menu:
 
@@ -620,9 +620,8 @@ compiler that understands the C++ language--and under some
 circumstances, you might want to compile programs from standard input,
 or otherwise without a suffix that flags them as C++ programs.  `g++'
 is a program that calls GNU CC with the default language set to C++,
-and automatically specifies linking against the GNU class library
-libg++.  (1) On many systems, the script `g++' is also installed with
-the name `c++'.
+and automatically specifies linking against the C++ library.  (1) On
+many systems, the script `g++' is also installed with the name `c++'.
 
    When you compile C++ programs, you may specify many of the same
 command-line options that you use for compiling programs in any
@@ -635,7 +634,7 @@ meaningful only for C++ programs.
 
    ---------- Footnotes ----------
 
-   (1) Prior to release 2 of the compiler, there was a separate `g++'
+   (1)  Prior to release 2 of the compiler, there was a separate `g++'
 compiler.  That version was based on GNU CC, but not integrated with
 it.  Versions of `g++' with a `1.XX' version number--for example, `g++'
 version 1.37 or 1.42--are much less reliable than the versions
@@ -942,7 +941,7 @@ supported by GNU CC.
      Accept `$' in identifiers.  You can also explicitly prohibit use of
      `$' with the option `-fno-dollars-in-identifiers'.  (GNU C allows
      `$' by default on most target systems, but there are a few
-     exceptions.)  Traditional C allowed the character `$' to form part
+     exceptions.) Traditional C allowed the character `$' to form part
      of identifiers.  However, ANSI C and C++ forbid `$' in identifiers.
 
 `-fenum-int-equiv'
@@ -1015,8 +1014,8 @@ supported by GNU CC.
      representable by a `short int'.  Users should not use this flag by
      default; if you need to use it, the compiler will tell you so.  If
      you compile any of your code with this flag, you must compile
-     *all* of your code with this flag (including libg++, if you use
-     it).
+     *all* of your code with this flag (including the C++ library, if
+     you use it).
 
      This flag is not useful when compiling with -fvtable-thunks.
 
@@ -1132,7 +1131,7 @@ supported by GNU CC.
 `-nostdinc++'
      Do not search for header files in the standard directories
      specific to C++, but do still search the other standard
-     directories.  (This option is used when building libg++.)
+     directories.  (This option is used when building the C++ library.)
 
 `-traditional'
      For C++ programs (in addition to the effects that apply to both C

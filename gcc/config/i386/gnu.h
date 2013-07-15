@@ -4,8 +4,7 @@
 #include <i386/linux.h>
 
 #undef CPP_PREDEFINES
-#define CPP_PREDEFINES "-Di386 -Acpu(i386) -Amachine(i386) \
--Dunix -Asystem(unix)  -DMACH -Asystem(mach) -D__GNU__ -Asystem(gnu)"
+#define CPP_PREDEFINES GNU_CPP_PREDEFINES("i386")
 
 #undef TARGET_VERSION
 #define TARGET_VERSION fprintf (stderr, " (i386 GNU)");

@@ -1,6 +1,6 @@
 /* Medium-level subroutines: convert bit-field store and extract
    and shifts, multiplies and divides to rtl instructions.
-   Copyright (C) 1987, 88, 89, 92-97, 1998 Free Software Foundation, Inc.
+   Copyright (C) 1987, 88, 89, 92-6, 1997 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -903,8 +903,6 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
 
       offset += SUBREG_WORD (op0);
 
-      inner_size = MIN (inner_size, BITS_PER_WORD);
-
       if (BYTES_BIG_ENDIAN && (outer_size < inner_size))
 	{
 	  bitpos += inner_size - outer_size;
@@ -1074,7 +1072,7 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
 	{
 	  int xbitpos = bitpos, xoffset = offset;
 	  rtx bitsize_rtx, bitpos_rtx;
-	  rtx last = get_last_insn ();
+	  rtx last = get_last_insn();
 	  rtx xop0 = op0;
 	  rtx xtarget = target;
 	  rtx xspec_target = spec_target;
@@ -1138,7 +1136,7 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
 	  /* If op0 is a register, we need it in MAXMODE (which is usually
 	     SImode). to make it acceptable to the format of extzv.  */
 	  if (GET_CODE (xop0) == SUBREG && GET_MODE (xop0) != maxmode)
-	    goto extzv_loses;
+	    abort ();
 	  if (GET_CODE (xop0) == REG && GET_MODE (xop0) != maxmode)
 	    xop0 = gen_rtx (SUBREG, maxmode, xop0, 0);
 
@@ -1214,7 +1212,7 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
 	{
 	  int xbitpos = bitpos, xoffset = offset;
 	  rtx bitsize_rtx, bitpos_rtx;
-	  rtx last = get_last_insn ();
+	  rtx last = get_last_insn();
 	  rtx xop0 = op0, xtarget = target;
 	  rtx xspec_target = spec_target;
 	  rtx xspec_target_subreg = spec_target_subreg;
@@ -1272,7 +1270,7 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
 	  /* If op0 is a register, we need it in MAXMODE (which is usually
 	     SImode) to make it acceptable to the format of extv.  */
 	  if (GET_CODE (xop0) == SUBREG && GET_MODE (xop0) != maxmode)
-	    goto extv_loses;
+	    abort ();
 	  if (GET_CODE (xop0) == REG && GET_MODE (xop0) != maxmode)
 	    xop0 = gen_rtx (SUBREG, maxmode, xop0, 0);
 

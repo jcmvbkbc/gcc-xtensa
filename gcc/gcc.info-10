@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -517,17 +517,17 @@ type.
 they name the registers; then you would need additional conditionals.
 For example, some 68000 operating systems call this register `%a5'.
 
-   Eventually there may be a way of asking the compiler to choose a
-register automatically, but first we need to figure out how it should
-choose and how to enable you to guide the choice.  No solution is
-evident.
-
    Defining such a register variable does not reserve the register; it
 remains available for other uses in places where flow control determines
 the variable's value is not live.  However, these registers are made
-unavailable for use in the reload pass.  I would not be surprised if
-excessive use of this feature leaves the compiler too few available
-registers to compile certain functions.
+unavailable for use in the reload pass; excessive use of this feature
+leaves the compiler too few available registers to compile certain
+functions.
+
+   This option does not guarantee that GNU CC will generate code that
+has this variable in the register you specify at all times.  You may not
+code an explicit reference to this register in an `asm' statement and
+assume it will always refer to this variable.
 
 
 File: gcc.info,  Node: Alternate Keywords,  Next: Incomplete Enums,  Prev: Explicit Reg Vars,  Up: C Extensions
@@ -946,7 +946,7 @@ any calls were not inlined, you will get linker errors.
 
    ---------- Footnotes ----------
 
-   (1) A file's "basename" was the name stripped of all leading path
+   (1)  A file's "basename" was the name stripped of all leading path
 information and of trailing suffixes, such as `.h' or `.C' or `.cc'.
 
 

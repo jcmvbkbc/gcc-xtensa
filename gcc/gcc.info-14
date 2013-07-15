@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -727,10 +727,12 @@ the following macros:
 `INSN_FROM_TARGET_P (INSN)'
      In an `insn' in a delay slot of a branch, indicates that the insn
      is from the target of the branch.  If the branch insn has
-     `INSN_ANNULLED_BRANCH_P' set, this insn should only be executed if
-     the branch is taken.  For annulled branches with this bit clear,
-     the insn should be executed only if the branch is not taken.
-     Stored in the `in_struct' field and printed as `/s'.
+     `INSN_ANNULLED_BRANCH_P' set, this insn will only be executed if
+     the branch is taken.  For annulled branches with
+     `INSN_FROM_TARGET_P' clear, the insn will be executed only if the
+     branch is not taken.  When `INSN_ANNULLED_BRANCH_P' is not set,
+     this insn will always be executed.  Stored in the `in_struct'
+     field and printed as `/s'.
 
 `CONSTANT_POOL_ADDRESS_P (X)'
      Nonzero in a `symbol_ref' if it refers to part of the current

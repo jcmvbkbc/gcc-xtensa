@@ -1,3 +1,5 @@
+#include "mips/sni-svr4.h"
+
 /* Enable debugging.  */
 #define DBX_DEBUGGING_INFO
 #define SDB_DEBUGGING_INFO
@@ -36,3 +38,6 @@ do {                                                  \
 	assemble_name (FILE, LABEL2);					\
 	fprintf (FILE, "\n");						\
   } while (0)
+
+
+

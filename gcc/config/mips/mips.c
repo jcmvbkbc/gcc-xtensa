@@ -195,9 +195,9 @@ enum processor_type mips_cpu;
 int mips_isa;
 
 #ifdef MIPS_ABI_DEFAULT
-/* Which ABI to use.  This is defined to a constant in mips.h if the target
+/* which ABI to use.  This is defined to a constant in mips.h if the target
    doesn't support multiple ABIs.  */
-int mips_abi;
+enum mips_abi_type mips_abi;
 #endif
 
 /* Strings to hold which cpu and instruction set architecture to use.  */

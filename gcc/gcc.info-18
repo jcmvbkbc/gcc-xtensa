@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -38,7 +38,7 @@ Standard Pattern Names For Generation
    Here is a table of the instruction names that are meaningful in the
 RTL generation pass of the compiler.  Giving one of these names to an
 instruction pattern tells the RTL generation pass that it can use the
-pattern in to accomplish a certain task.
+pattern to accomplish a certain task.
 
 `movM'
      Here M stands for a two-letter machine mode name, in lower case.
@@ -270,8 +270,16 @@ pattern in to accomplish a certain task.
 `movstrM'
      Block move instruction.  The addresses of the destination and
      source strings are the first two operands, and both are in mode
-     `Pmode'.  The number of bytes to move is the third operand, in
-     mode M.
+     `Pmode'.
+
+     The number of bytes to move is the third operand, in mode M.
+     Usually, you specify `word_mode' for M.  However, if you can
+     generate better code knowing the range of valid lengths is smaller
+     than those representable in a full word, you should provide a
+     pattern with a mode corresponding to the range of values you can
+     handle efficiently (e.g., `QImode' for values in the range 0-127;
+     note we avoid numbers that appear negative) and also a pattern
+     with `word_mode'.
 
      The fourth operand is the known shared alignment of the source and
      destination, in the form of a `const_int' rtx.  Thus, if the
@@ -284,7 +292,8 @@ pattern in to accomplish a certain task.
 `clrstrM'
      Block clear instruction.  The addresses of the destination string
      is the first operand, in mode `Pmode'.  The number of bytes to
-     clear is the second operand, in mode M.
+     clear is the second operand, in mode M.  See `movstrM' for a
+     discussion of the choice of mode.
 
      The third operand is the known alignment of the destination, in
      the form of a `const_int' rtx.  Thus, if the compiler knows that
@@ -765,10 +774,9 @@ converting a byte to floating point.  An instruction converting an
 integer to floating point could match either one.  We put the pattern
 to convert the fullword first to make sure that one will be used rather
 than the other.  (Otherwise a large integer might be generated as a
-single-byte immediate quantity, which would not work.)  Instead of
-using this pattern ordering it would be possible to make the pattern
-for convert-a-byte smart enough to deal properly with any constant
-value.
+single-byte immediate quantity, which would not work.) Instead of using
+this pattern ordering it would be possible to make the pattern for
+convert-a-byte smart enough to deal properly with any constant value.
 
 
 File: gcc.info,  Node: Dependent Patterns,  Next: Jump Patterns,  Prev: Pattern Ordering,  Up: Machine Desc

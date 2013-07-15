@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -409,7 +409,7 @@ in the insn list with the insns given by NEW-INSN-PATTERN-1,
 NEW-INSN-PATTERN-2, etc.
 
    The PREPARATION STATEMENTS are similar to those statements that are
-specified for `define_expand' (*note Expander Definitions::.)  and are
+specified for `define_expand' (*note Expander Definitions::.) and are
 executed before the new RTL is generated to prepare for the generated
 code or emit some insns whose pattern is not fixed.  Unlike those in
 `define_expand', however, these statements must not generate any new

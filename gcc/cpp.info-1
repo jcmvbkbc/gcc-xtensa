@@ -1,4 +1,4 @@
-This is Info file cpp.info, produced by Makeinfo version 1.68 from the
+This is Info file cpp.info, produced by Makeinfo version 1.67 from the
 input file cpp.texi.
 
    This file documents the GNU C Preprocessor.
@@ -813,7 +813,7 @@ are GNU C extensions.
      or a C++ compiler.
 
 `__STRICT_ANSI__'
-     This macro is defined if and only if the `-ansi' switch was
+     GNU C defines this macro if and only if the `-ansi' switch was
      specified when GNU C was invoked.  Its definition is the null
      string.  This macro exists primarily to direct certain GNU header
      files not to define certain traditional Unix constructs which are
@@ -832,43 +832,42 @@ are GNU C extensions.
      the nesting level is zero.
 
 `__VERSION__'
-     This macro expands to a string which describes the version number
-     of GNU C.  The string is normally a sequence of decimal numbers
-     separated by periods, such as `"2.6.0"'.  The only reasonable use
-     of this macro is to incorporate it into a string constant.
+     This macro expands to a string constant which describes the
+     version number of GNU C.  The string is normally a sequence of
+     decimal numbers separated by periods, such as `"2.6.0"'.
 
 `__OPTIMIZE__'
-     This macro is defined in optimizing compilations.  It causes
+     GNU CC defines this macro in optimizing compilations.  It causes
      certain GNU header files to define alternative macro definitions
-     for some system library functions.  It is unwise to refer to or
+     for some system library functions.  You should not refer to or
      test the definition of this macro unless you make very sure that
      programs will execute with the same effect regardless.
 
 `__CHAR_UNSIGNED__'
-     This macro is defined if and only if the data type `char' is
+     GNU C defines this macro if and only if the data type `char' is
      unsigned on the target machine.  It exists to cause the standard
-     header file `limits.h' to work correctly.  It is bad practice to
-     refer to this macro yourself; instead, refer to the standard
-     macros defined in `limits.h'.  The preprocessor uses this macro to
-     determine whether or not to sign-extend large character constants
-     written in octal; see *Note The `#if' Directive: #if Directive.
+     header file `limits.h' to work correctly.  You should not refer to
+     this macro yourself; instead, refer to the standard macros defined
+     in `limits.h'.  The preprocessor uses this macro to determine
+     whether or not to sign-extend large character constants written in
+     octal; see *Note The `#if' Directive: #if Directive.
 
 `__REGISTER_PREFIX__'
-     This macro expands to a string describing the prefix applied to cpu
-     registers in assembler code.  It can be used to write assembler
-     code that is usable in multiple environments.  For example, in the
-     `m68k-aout' environment it expands to the string `""', but in the
-     `m68k-coff' environment it expands to the string `"%"'.
+     This macro expands to a string (not a string constant) describing
+     the prefix applied to CPU registers in assembler code.  You can
+     use it to write assembler code that is usable in multiple
+     environments.  For example, in the `m68k-aout' environment it
+     expands to the null string, but in the `m68k-coff' environment it
+     expands to the string `%'.
 
 `__USER_LABEL_PREFIX__'
-     This macro expands to a string describing the prefix applied to
-     user generated labels in assembler code.  It can be used to write
-     assembler code that is usable in multiple environments.  For
-     example, in the `m68k-aout' environment it expands to the string
-     `"_"', but in the `m68k-coff' environment it expands to the string
-     `""'.  This does not work with the `-mno-underscores' option that
-     the i386 OSF/rose and m88k targets provide nor with the `-mcall*'
-     options of the rs6000 System V Release 4 target.
+     Similar to `__REGISTER_PREFIX__', but describes the prefix applied
+     to user generated labels in assembler code.  For example, in the
+     `m68k-aout' environment it expands to the string `_', but in the
+     `m68k-coff' environment it expands to the null string.  This does
+     not work with the `-mno-underscores' option that the i386 OSF/rose
+     and m88k targets provide nor with the `-mcall*' options of the
+     rs6000 System V Release 4 target.
 
 
 File: cpp.info,  Node: Nonstandard Predefined,  Prev: Standard Predefined,  Up: Predefined

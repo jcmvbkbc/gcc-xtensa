@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -69,8 +69,8 @@ Index
 * > in constraint:                       Simple Constraints.
 * >?:                                    Min and Max.
 * ? in constraint:                       Multi-Alternative.
-* ?: extensions <1>:                     Conditionals.
-* ?: extensions:                         Lvalues.
+* ?: extensions <1>:                     Lvalues.
+* ?: extensions:                         Conditionals.
 * ?: side effect:                        Conditionals.
 * \:                                     Output Template.
 * _ in variables in macros:              Naming Types.
@@ -91,8 +91,8 @@ Index
 * __main:                                Collect2.
 * abort <1>:                             Portability.
 * abort:                                 C Dialect Options.
-* abs <1>:                               Arithmetic.
-* abs:                                   C Dialect Options.
+* abs <1>:                               C Dialect Options.
+* abs:                                   Arithmetic.
 * abs and attributes:                    Expressions.
 * absM2 instruction pattern:             Standard Names.
 * absolute value:                        Arithmetic.
@@ -119,8 +119,8 @@ Index
 * ADJUST_PRIORITY:                       Costs.
 * aggregates as return values:           Aggregate Return.
 * alias attribute:                       Function Attributes.
-* aligned attribute <1>:                 Type Attributes.
-* aligned attribute:                     Variable Attributes.
+* aligned attribute <1>:                 Variable Attributes.
+* aligned attribute:                     Type Attributes.
 * alignment:                             Alignment.
 * ALL_REGS:                              Register Classes.
 * Alliant:                               Interoperation.
@@ -312,8 +312,8 @@ Index
 * C language extensions:                 C Extensions.
 * C language, traditional:               C Dialect Options.
 * C statements for assembler output:     Output Statement.
-* c++:                                   Invoking G++.
 * C++:                                   G++ and GCC.
+* c++:                                   Invoking G++.
 * C++ comments:                          C++ Comments.
 * C++ compilation options:               Invoking GCC.
 * C++ interface and implementation headers: C++ Interface.
@@ -437,8 +437,8 @@ Index
 * const0_rtx:                            Constants.
 * CONST1_RTX:                            Constants.
 * const1_rtx:                            Constants.
-* CONST2_RTX:                            Constants.
 * const2_rtx:                            Constants.
+* CONST2_RTX:                            Constants.
 * CONST_CALL_P:                          Flags.
 * CONST_COSTS:                           Costs.
 * const_double:                          Constants.
@@ -729,8 +729,8 @@ Index
 * FLOAT_WORDS_BIG_ENDIAN:                Storage Layout.
 * FLOATIFY:                              Library Calls.
 * floating point and cross compilation:  Cross-compilation.
-* floating point precision <1>:          Disappointments.
-* floating point precision:              Optimize Options.
+* floating point precision <1>:          Optimize Options.
+* floating point precision:              Disappointments.
 * floatMN2 instruction pattern:          Standard Names.
 * floatunsMN2 instruction pattern:       Standard Names.
 * force_reg:                             Standard Names.
@@ -1064,6 +1064,7 @@ Index
 * LINK_LIBGCC_SPECIAL:                   Driver.
 * LINK_LIBGCC_SPECIAL_1:                 Driver.
 * LINK_SPEC:                             Driver.
+* LINKER_DOES_NOT_WORK_WITH_DWARF2:      SDB and DWARF.
 * lo_sum:                                Arithmetic.
 * load address instruction:              Simple Constraints.
 * LOAD_EXTEND_OP:                        Misc.
@@ -1081,8 +1082,8 @@ Index
 * LONG_LONG_TYPE_SIZE:                   Type Layout.
 * LONG_TYPE_SIZE:                        Type Layout.
 * longjmp:                               Global Reg Vars.
-* longjmp and automatic variables <1>:   Interface.
-* longjmp and automatic variables:       C Dialect Options.
+* longjmp and automatic variables <1>:   C Dialect Options.
+* longjmp and automatic variables:       Interface.
 * longjmp incompatibilities:             Incompatibilities.
 * longjmp warnings:                      Warning Options.
 * LONGJMP_RESTORE_FROM_STACK:            Elimination.
@@ -1383,8 +1384,8 @@ Index
 * peephole optimizer definitions:        Peephole Definitions.
 * percent sign:                          Output Template.
 * perform_...:                           Library Calls.
-* PIC <1>:                               PIC.
-* PIC:                                   Code Gen Options.
+* PIC <1>:                               Code Gen Options.
+* PIC:                                   PIC.
 * PIC_OFFSET_TABLE_REG_CALL_CLOBBERED:   PIC.
 * PIC_OFFSET_TABLE_REGNUM:               PIC.
 * plus:                                  Arithmetic.

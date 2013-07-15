@@ -1,5 +1,4 @@
-/* Definitions of target machine for GNU compiler. 
-   Sony RISC NEWS (mips) System V version.
+/* Definitions of target machine for GNU compiler.  Sony RISC NEWS (mips) System V version.
    Copyright (C) 1992 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
@@ -60,3 +59,4 @@ Boston, MA 02111-1307, USA.  */
 #endif /* !_SC_PAGE_SIZE */
 #endif /*  L_trampoline */
 
+#include "mips/mips.h"

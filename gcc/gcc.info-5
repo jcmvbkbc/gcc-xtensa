@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -206,8 +206,6 @@ DEC Alpha Options
      option or that of the CPU on which GNU CC was built if none was
      specified.
 
-`-mcpu=CPU TYPE'
-
 `-mcpu=CPU_TYPE'
      Set the instruction set, register set, and instruction scheduling
      parameters for machine type CPU_TYPE.  You can specify either the
@@ -359,7 +357,6 @@ V850 Options
      up into a register, and call indirect through the pointer.
 
 `-mno-ep'
-
 `-mep'
      Do not optimize (do optimize) basic blocks that use the same index
      pointer 4 or more times to copy pointer into the `ep' register, and

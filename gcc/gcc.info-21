@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -802,16 +802,13 @@ constraint letters.
 
 `EXTRA_CONSTRAINT (VALUE, C)'
      A C expression that defines the optional machine-dependent
-     constraint letters (
-
-``Q', `R', `S', `T', `U') that can'
-     be used to segregate specific types of operands, usually memory
-     references, for the target machine.  Normally this macro will not
-     be defined.  If it is required for a particular target machine, it
-     should return 1 if VALUE corresponds to the operand type
-     represented by the constraint letter C.  If C is not defined as an
-     extra constraint, the value returned should be 0 regardless of
-     VALUE.
+     constraint letters (`Q', `R', `S', `T', `U') that can be used to
+     segregate specific types of operands, usually memory references,
+     for the target machine.  Normally this macro will not be defined.
+     If it is required for a particular target machine, it should
+     return 1 if VALUE corresponds to the operand type represented by
+     the constraint letter C.  If C is not defined as an extra
+     constraint, the value returned should be 0 regardless of VALUE.
 
      For example, on the ROMP, load instructions cannot have their
      output in r0 if the memory reference contains a symbolic address.

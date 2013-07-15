@@ -1,5 +1,4 @@
-/* Definitions of target machine for GNU compiler.
-   MIPS RISC-OS 5.0 System V.4 version.
+/* Definitions of target machine for GNU compiler.  MIPS RISC-OS 5.0 System V.4 version.
    Copyright (C) 1992 Free Software Foundation, Inc.
 
 This file is part of GNU CC.

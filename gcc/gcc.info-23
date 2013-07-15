@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -239,7 +239,7 @@ below.
      used for arguments, each for a particular category of data types.
      (For example, on some machines, floating-point registers are used
      for floating-point arguments while other arguments are passed in
-     the general registers.)  To make non-varargs functions use the
+     the general registers.) To make non-varargs functions use the
      proper calling convention, you have defined the `CUMULATIVE_ARGS'
      data type to record how many registers in each category have been
      used so far

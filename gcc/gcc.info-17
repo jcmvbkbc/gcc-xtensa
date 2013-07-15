@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -421,7 +421,7 @@ be identical.  If we are considering an insn of the form
 the first pattern would not apply at all, because this insn does not
 contain two identical subexpressions in the right place.  The pattern
 would say, "That does not look like an add instruction; try other
-patterns."  The second pattern would say, "Yes, that's an add
+patterns." The second pattern would say, "Yes, that's an add
 instruction, but there is something wrong with it."  It would direct
 the reload pass of the compiler to generate additional insns to make
 the constraint true.  The results might look like this:
@@ -697,7 +697,6 @@ However, here is a summary of the machine-dependent constraints
 available on some particular machines.
 
 *ARM family--`arm.h'*
-
     `f'
           Floating-point register
 
@@ -739,7 +738,6 @@ available on some particular machines.
           A symbol in the text segment of the current file
 
 *AMD 29000 family--`a29k.h'*
-
     `l'
           Local register 0
 
@@ -792,7 +790,6 @@ available on some particular machines.
           machine independent `E' or `F' instead)
 
 *IBM RS6000--`rs6000.h'*
-
     `b'
           Address base register
 
@@ -862,7 +859,6 @@ available on some particular machines.
           System V Release 4 small data area reference
 
 *Intel 386--`i386.h'*
-
     `q'
           `a', `b', `c', or `d' register
 
@@ -918,7 +914,6 @@ available on some particular machines.
           Standard 80387 floating point constant
 
 *Intel 960--`i960.h'*
-
     `f'
           Floating point register (`fp0' to `fp3')
 
@@ -947,7 +942,6 @@ available on some particular machines.
           Floating point 1
 
 *MIPS--`mips.h'*
-
     `d'
           General-purpose integer register
 
@@ -1010,7 +1004,6 @@ available on some particular machines.
           preferable for `asm' statements)
 
 *Motorola 680x0--`m68k.h'*
-
     `a'
           Address register
 
@@ -1048,7 +1041,6 @@ available on some particular machines.
           Floating point constant that can be used by Sun FPA
 
 *SPARC--`sparc.h'*
-
     `f'
           Floating-point register that can hold 32 or 64 bit values.
 

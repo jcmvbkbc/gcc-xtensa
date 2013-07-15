@@ -1894,7 +1894,7 @@ operand_equal_for_comparison_p (arg0, arg1, other)
      tree other;
 {
   int unsignedp1, unsignedpo;
-  tree primarg0, primarg1, primother;
+  tree primarg1, primother;
   unsigned correct_width;
 
   if (operand_equal_p (arg0, arg1, 0))
@@ -1903,14 +1903,6 @@ operand_equal_for_comparison_p (arg0, arg1, other)
   if (! INTEGRAL_TYPE_P (TREE_TYPE (arg0))
       || ! INTEGRAL_TYPE_P (TREE_TYPE (arg1)))
     return 0;
-
-  /* Discard any conversions that don't change the modes of ARG0 and ARG1
-     and see if the inner values are the same.  This removes any
-     signedness comparison, which doesn't matter here.  */
-  primarg0 = arg0, primarg1 = arg1;
-  STRIP_NOPS (primarg0);  STRIP_NOPS (primarg1);
-  if (operand_equal_p (primarg0, primarg1, 0))
-    return 1;
 
   /* Duplicate what shorten_compare does to ARG1 and see if that gives the
      actual comparison operand, ARG0.
@@ -4056,13 +4048,6 @@ fold (expr)
 	      && ! (final_prec != GET_MODE_BITSIZE (TYPE_MODE (final_type))
 		    && TYPE_MODE (final_type) == TYPE_MODE (inter_type))
 	      && ! final_ptr)
-	    return convert (final_type, TREE_OPERAND (TREE_OPERAND (t, 0), 0));
-
-	  /* If we have a sign-extension of a zero-extended value, we can
-	     replace that by a single zero-extension.  */
-	  if (inside_int && inter_int && final_int
-	      && inside_prec < inter_prec && inter_prec < final_prec
-	      && inside_unsignedp && !inter_unsignedp)
 	    return convert (final_type, TREE_OPERAND (TREE_OPERAND (t, 0), 0));
 
 	  /* Two conversions in a row are not needed unless:

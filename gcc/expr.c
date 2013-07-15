@@ -977,41 +977,6 @@ convert_move (to, from, unsignedp)
     }
 
   /* Handle pointer conversion */			/* SPEE 900220 */
-  if (to_mode == PQImode)
-    {
-      if (from_mode != QImode)
-	from = convert_to_mode (QImode, from, unsignedp);
-
-#ifdef HAVE_truncqipqi2
-      if (HAVE_truncqipqi2)
-	{
-	  emit_unop_insn (CODE_FOR_truncqipqi2, to, from, UNKNOWN);
-	  return;
-	}
-#endif /* HAVE_truncqipqi2 */
-      abort ();
-    }
-
-  if (from_mode == PQImode)
-    {
-      if (to_mode != QImode)
-	{
-	  from = convert_to_mode (QImode, from, unsignedp);
-	  from_mode = QImode;
-	}
-      else
-	{
-#ifdef HAVE_extendpqiqi2
-	  if (HAVE_extendpqiqi2)
-	    {
-	      emit_unop_insn (CODE_FOR_extendpqiqi2, to, from, UNKNOWN);
-	      return;
-	    }
-#endif /* HAVE_extendpqiqi2 */
-	  abort ();
-	}
-    }
-
   if (to_mode == PSImode)
     {
       if (from_mode != SImode)
@@ -2496,15 +2461,11 @@ get_push_address (size)
    to store the arg.  On machines with push insns, ARGS_ADDR is 0 when a
    argument block has not been preallocated.
 
-   ARGS_SO_FAR is the size of args previously pushed for this call.
-
-   REG_PARM_STACK_SPACE is nonzero if functions require stack space
-   for arguments passed in registers.  If nonzero, it will be the number
-   of bytes required.  */
+   ARGS_SO_FAR is the size of args previously pushed for this call.  */
 
 void
 emit_push_insn (x, mode, type, size, align, partial, reg, extra,
-		args_addr, args_so_far, reg_parm_stack_space)
+		args_addr, args_so_far)
      register rtx x;
      enum machine_mode mode;
      tree type;
@@ -2515,7 +2476,6 @@ emit_push_insn (x, mode, type, size, align, partial, reg, extra,
      int extra;
      rtx args_addr;
      rtx args_so_far;
-     int reg_parm_stack_space;
 {
   rtx xinner;
   enum direction stack_direction
@@ -2562,7 +2522,11 @@ emit_push_insn (x, mode, type, size, align, partial, reg, extra,
 	 skip the part of stack space corresponding to the registers.
 	 Otherwise, start copying to the beginning of the stack space,
 	 by setting SKIP to 0.  */
-      skip = (reg_parm_stack_space == 0) ? 0 : used;
+#ifndef REG_PARM_STACK_SPACE
+      skip = 0;
+#else
+      skip = used;
+#endif
 
 #ifdef PUSH_ROUNDING
       /* Do it with several push insns if that doesn't take lots of insns
@@ -2676,54 +2640,64 @@ emit_push_insn (x, mode, type, size, align, partial, reg, extra,
 			      INTVAL (size), align);
 	      goto ret;
 	    }
-	  else
+
+	  /* Try the most limited insn first, because there's no point
+	     including more than one in the machine description unless
+	     the more limited one has some advantage.  */
+#ifdef HAVE_movstrqi
+	  if (HAVE_movstrqi
+	      && GET_CODE (size) == CONST_INT
+	      && ((unsigned) INTVAL (size)
+		  < (1 << (GET_MODE_BITSIZE (QImode) - 1))))
 	    {
-	      rtx opalign = GEN_INT (align);
-	      enum machine_mode mode;
-	      rtx target = gen_rtx (MEM, BLKmode, temp);
-
-	      for (mode = GET_CLASS_NARROWEST_MODE (MODE_INT);
-		   mode != VOIDmode;
-		   mode = GET_MODE_WIDER_MODE (mode))
+	      rtx pat = gen_movstrqi (gen_rtx (MEM, BLKmode, temp),
+				      xinner, size, GEN_INT (align));
+	      if (pat != 0)
 		{
-		  enum insn_code code = movstr_optab[(int) mode];
-
-		  if (code != CODE_FOR_nothing
-		      && ((GET_CODE (size) == CONST_INT
-			   && ((unsigned HOST_WIDE_INT) INTVAL (size)
-			       <= (GET_MODE_MASK (mode) >> 1)))
-			  || GET_MODE_BITSIZE (mode) >= BITS_PER_WORD)
-		      && (insn_operand_predicate[(int) code][0] == 0
-			  || ((*insn_operand_predicate[(int) code][0])
-			      (target, BLKmode)))
-		      && (insn_operand_predicate[(int) code][1] == 0
-			  || ((*insn_operand_predicate[(int) code][1])
-			      (xinner, BLKmode)))
-		      && (insn_operand_predicate[(int) code][3] == 0
-			  || ((*insn_operand_predicate[(int) code][3])
-			      (opalign, VOIDmode))))
-		    {
-		      rtx op2 = convert_to_mode (mode, size, 1);
-		      rtx last = get_last_insn ();
-		      rtx pat;
-
-		      if (insn_operand_predicate[(int) code][2] != 0
-			  && ! ((*insn_operand_predicate[(int) code][2])
-				(op2, mode)))
-			op2 = copy_to_mode_reg (mode, op2);
-
-		      pat = GEN_FCN ((int) code) (target, xinner,
-						  op2, opalign);
-		      if (pat)
-			{
-			  emit_insn (pat);
-			  goto ret;
-			}
-		      else
-			delete_insns_since (last);
-		    }
+		  emit_insn (pat);
+		  goto ret;
 		}
 	    }
+#endif
+#ifdef HAVE_movstrhi
+	  if (HAVE_movstrhi
+	      && GET_CODE (size) == CONST_INT
+	      && ((unsigned) INTVAL (size)
+		  < (1 << (GET_MODE_BITSIZE (HImode) - 1))))
+	    {
+	      rtx pat = gen_movstrhi (gen_rtx (MEM, BLKmode, temp),
+				      xinner, size, GEN_INT (align));
+	      if (pat != 0)
+		{
+		  emit_insn (pat);
+		  goto ret;
+		}
+	    }
+#endif
+#ifdef HAVE_movstrsi
+	  if (HAVE_movstrsi)
+	    {
+	      rtx pat = gen_movstrsi (gen_rtx (MEM, BLKmode, temp),
+				      xinner, size, GEN_INT (align));
+	      if (pat != 0)
+		{
+		  emit_insn (pat);
+		  goto ret;
+		}
+	    }
+#endif
+#ifdef HAVE_movstrdi
+	  if (HAVE_movstrdi)
+	    {
+	      rtx pat = gen_movstrdi (gen_rtx (MEM, BLKmode, temp),
+				      xinner, size, GEN_INT (align));
+	      if (pat != 0)
+		{
+		  emit_insn (pat);
+		  goto ret;
+		}
+	    }
+#endif
 
 #ifndef ACCUMULATE_OUTGOING_ARGS
 	  /* If the source is referenced relative to the stack pointer,
@@ -2789,7 +2763,11 @@ emit_push_insn (x, mode, type, size, align, partial, reg, extra,
 	 skip the part of stack space corresponding to the registers.
 	 Otherwise, start copying to the beginning of the stack space,
 	 by setting SKIP to 0.  */
-      skip = (reg_parm_stack_space == 0) ? 0 : not_stack;
+#ifndef REG_PARM_STACK_SPACE
+      skip = 0;
+#else
+      skip = not_stack;
+#endif
 
       if (CONSTANT_P (x) && ! LEGITIMATE_CONSTANT_P (x))
 	x = validize_mem (force_const_mem (mode, x));
@@ -2813,8 +2791,7 @@ emit_push_insn (x, mode, type, size, align, partial, reg, extra,
 			  word_mode, NULL_TREE, NULL_RTX, align, 0, NULL_RTX,
 			  0, args_addr,
 			  GEN_INT (args_offset + ((i - not_stack + skip)
-						  * UNITS_PER_WORD)),
-			  reg_parm_stack_space);
+						  * UNITS_PER_WORD)));
     }
   else
     {
@@ -6838,11 +6815,6 @@ expand_expr (exp, target, tmode, modifier)
 			 && REGNO (original_target) >= FIRST_PSEUDO_REGISTER
 			 && original_target == var_rtx (singleton)))
 		 && GET_MODE (original_target) == mode
-#ifdef HAVE_conditional_move
-		 && (! can_conditionally_move_p (mode)
-		     || GET_CODE (original_target) == REG
-		     || TREE_ADDRESSABLE (type))
-#endif
 		 && ! (GET_CODE (original_target) == MEM
 		       && MEM_VOLATILE_P (original_target)))
 	  temp = original_target;

@@ -1624,9 +1624,7 @@ fixup_var_refs_insns (var, promoted_mode, unsignedp, insn, toplevel)
   while (insn)
     {
       rtx next = NEXT_INSN (insn);
-      rtx set, prev, prev_set;
       rtx note;
-
       if (GET_RTX_CLASS (GET_CODE (insn)) == 'i')
 	{
 	  /* If this is a CLOBBER of VAR, delete it.
@@ -1652,22 +1650,14 @@ fixup_var_refs_insns (var, promoted_mode, unsignedp, insn, toplevel)
 	    }
 
 	  /* The insn to load VAR from a home in the arglist
-	     is now a no-op.  When we see it, just delete it.
-	     Similarly if this is storing VAR from a register from which
-	     it was loaded in the previous insn.  This will occur
-	     when an ADDRESSOF was made for an arglist slot.  */
+	     is now a no-op.  When we see it, just delete it.  */
 	  else if (toplevel
-		   && (set = single_set (insn)) != 0
-		   && SET_DEST (set) == var
+		   && GET_CODE (PATTERN (insn)) == SET
+		   && SET_DEST (PATTERN (insn)) == var
 		   /* If this represents the result of an insn group,
 		      don't delete the insn.  */
 		   && find_reg_note (insn, REG_RETVAL, NULL_RTX) == 0
-		   && (rtx_equal_p (SET_SRC (set), var)
-		       || (GET_CODE (SET_SRC (set)) == REG
-			   && (prev = prev_nonnote_insn (insn)) != 0
-			   && (prev_set = single_set (prev)) != 0
-			   && SET_DEST (prev_set) == SET_SRC (set)
-			   && rtx_equal_p (SET_SRC (prev_set), var))))
+		   && rtx_equal_p (SET_SRC (PATTERN (insn)), var))
 	    {
 	      /* In unoptimized compilation, we shouldn't call delete_insn
 		 except in jump.c doing warnings.  */
@@ -3737,7 +3727,11 @@ assign_parms (fndecl, second_time)
       /* Set NAMED_ARG if this arg should be treated as a named arg.  For
 	 most machines, if this is a varargs/stdarg function, then we treat
 	 the last named arg as if it were anonymous too.  */
-      int named_arg = STRICT_ARGUMENT_NAMING ? 1 : ! last_named;
+#ifdef STRICT_ARGUMENT_NAMING
+      int named_arg = 1;
+#else
+      int named_arg = ! last_named;
+#endif
 
       if (TREE_TYPE (parm) == error_mark_node
 	  /* This can happen after weird syntax errors

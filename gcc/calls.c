@@ -544,10 +544,14 @@ expand_call (exp, target, ignore)
      So the entire argument block must then be preallocated (i.e., we
      ignore PUSH_ROUNDING in that case).  */
 
+#if defined(REG_PARM_STACK_SPACE) && ! defined(OUTGOING_REG_PARM_STACK_SPACE)
+  int must_preallocate = 1;
+#else
 #ifdef PUSH_ROUNDING
   int must_preallocate = 0;
 #else
   int must_preallocate = 1;
+#endif
 #endif
 
   /* Size of the stack reserved for parameter registers.  */
@@ -657,11 +661,6 @@ expand_call (exp, target, ignore)
 #endif
 #endif
 
-#if defined(PUSH_ROUNDING) && ! defined(OUTGOING_REG_PARM_STACK_SPACE)
-  if (reg_parm_stack_space > 0)
-    must_preallocate = 1;
-#endif
-
   /* Warn if this value is an aggregate type,
      regardless of which calling convention we are using for it.  */
   if (warn_aggregate_return && AGGREGATE_TYPE_P (TREE_TYPE (exp)))
@@ -768,18 +767,18 @@ expand_call (exp, target, ignore)
 		     outgoing argument list in addition to the requested
 		     space, but there is no way to ask for stack space such
 		     that an argument list of a certain length can be
-		     safely constructed. 
+		     safely constructed.  */
 
-		     Add the stack space reserved for register arguments, if
-		     any, in the inline function.  What is really needed is the
+		  int adjust = OUTGOING_ARGS_SIZE (DECL_SAVED_INSNS (fndecl));
+#ifdef REG_PARM_STACK_SPACE
+		  /* Add the stack space reserved for register arguments
+		     in the inline function.  What is really needed is the
 		     largest value of reg_parm_stack_space in the inline
 		     function, but that is not available.  Using the current
 		     value of reg_parm_stack_space is wrong, but gives
 		     correct results on all supported machines.  */
-
-		  int adjust = (OUTGOING_ARGS_SIZE (DECL_SAVED_INSNS (fndecl))
-				+ reg_parm_stack_space);
-
+		  adjust += reg_parm_stack_space;
+#endif
 		  start_sequence ();
 		  emit_stack_save (SAVE_BLOCK, &old_stack_level, NULL_RTX);
 		  allocate_dynamic_stack_space (GEN_INT (adjust),
@@ -949,11 +948,11 @@ expand_call (exp, target, ignore)
 
   /* Compute number of named args.
      Normally, don't include the last named arg if anonymous args follow.
-     We do include the last named arg if STRICT_ARGUMENT_NAMING is nonzero.
+     We do include the last named arg if STRICT_ARGUMENT_NAMING is defined.
      (If no anonymous args follow, the result of list_length is actually
      one too large.  This is harmless.)
 
-     If SETUP_INCOMING_VARARGS is defined and STRICT_ARGUMENT_NAMING is zero,
+     If SETUP_INCOMING_VARARGS is defined and STRICT_ARGUMENT_NAMING is not,
      this machine will be able to place unnamed args that were passed in
      registers into the stack.  So treat all args as named.  This allows the
      insns emitting for a specific argument list to be independent of the
@@ -962,20 +961,18 @@ expand_call (exp, target, ignore)
      If SETUP_INCOMING_VARARGS is not defined, we do not have any reliable
      way to pass unnamed args in registers, so we must force them into
      memory.  */
-
-  if ((STRICT_ARGUMENT_NAMING
-#ifndef SETUP_INCOMING_VARARGS
-       || 1
-#endif
-       )
-      && TYPE_ARG_TYPES (funtype) != 0)
+#if !defined(SETUP_INCOMING_VARARGS) || defined(STRICT_ARGUMENT_NAMING)
+  if (TYPE_ARG_TYPES (funtype) != 0)
     n_named_args
       = (list_length (TYPE_ARG_TYPES (funtype))
+#ifndef STRICT_ARGUMENT_NAMING
 	 /* Don't include the last named arg.  */
-	 - (STRICT_ARGUMENT_NAMING ? 0 : -1)
+	 - 1
+#endif
 	 /* Count the struct value address, if it is passed as a parm.  */
 	 + structure_value_addr_parm);
   else
+#endif
     /* If we know nothing, treat all args as named.  */
     n_named_args = num_actuals;
 
@@ -1150,7 +1147,9 @@ expand_call (exp, target, ignore)
 
       /* Compute the stack-size of this argument.  */
       if (args[i].reg == 0 || args[i].partial != 0
+#ifdef REG_PARM_STACK_SPACE
 	  || reg_parm_stack_space > 0
+#endif
 	  || args[i].pass_on_stack)
 	locate_and_pad_parm (mode, type,
 #ifdef STACK_PARMS_IN_REG_PARM_AREA
@@ -1165,12 +1164,14 @@ expand_call (exp, target, ignore)
       args[i].slot_offset = args_size;
 #endif
 
+#ifndef REG_PARM_STACK_SPACE
       /* If a part of the arg was put into registers,
 	 don't include that part in the amount pushed.  */
-      if (reg_parm_stack_space == 0 && ! args[i].pass_on_stack)
+      if (! args[i].pass_on_stack)
 	args[i].size.constant -= ((args[i].partial * UNITS_PER_WORD)
 				  / (PARM_BOUNDARY / BITS_PER_UNIT)
 				  * (PARM_BOUNDARY / BITS_PER_UNIT));
+#endif
       
       /* Update ARGS_SIZE, the total stack space for args so far.  */
 
@@ -1227,11 +1228,12 @@ expand_call (exp, target, ignore)
 	args_size.var = round_up (args_size.var, STACK_BYTES);
 #endif
 
+#ifdef REG_PARM_STACK_SPACE
       if (reg_parm_stack_space > 0)
 	{
 	  args_size.var
 	    = size_binop (MAX_EXPR, args_size.var,
-			  size_int (reg_parm_stack_space));
+			  size_int (REG_PARM_STACK_SPACE (fndecl)));
 
 #ifndef OUTGOING_REG_PARM_STACK_SPACE
 	  /* The area corresponding to register parameters is not to count in
@@ -1241,6 +1243,7 @@ expand_call (exp, target, ignore)
 			  size_int (reg_parm_stack_space));
 #endif
 	}
+#endif
     }
   else
     {
@@ -1249,16 +1252,16 @@ expand_call (exp, target, ignore)
 			     / STACK_BYTES) * STACK_BYTES);
 #endif
 
+#ifdef REG_PARM_STACK_SPACE
       args_size.constant = MAX (args_size.constant,
 				reg_parm_stack_space);
-
 #ifdef MAYBE_REG_PARM_STACK_SPACE
       if (reg_parm_stack_space == 0)
 	args_size.constant = 0;
 #endif
-
 #ifndef OUTGOING_REG_PARM_STACK_SPACE
       args_size.constant -= reg_parm_stack_space;
+#endif
 #endif
     }
 
@@ -1424,7 +1427,7 @@ expand_call (exp, target, ignore)
 	     Another approach might be to try to reorder the argument
 	     evaluations to avoid this conflicting stack usage.  */
 
-#ifndef OUTGOING_REG_PARM_STACK_SPACE
+#if defined(REG_PARM_STACK_SPACE) && ! defined(OUTGOING_REG_PARM_STACK_SPACE)
 	  /* Since we will be writing into the entire argument area, the
 	     map must be allocated for its entire size, not just the part that
 	     is the responsibility of the caller.  */
@@ -1496,7 +1499,7 @@ expand_call (exp, target, ignore)
      to initialize an argument.  */
   if (stack_arg_under_construction)
     {
-#ifndef OUTGOING_REG_PARM_STACK_SPACE
+#if defined(REG_PARM_STACK_SPACE) && ! defined(OUTGOING_REG_PARM_STACK_SPACE)
       rtx push_size = GEN_INT (reg_parm_stack_space + args_size.constant);
 #else
       rtx push_size = GEN_INT (args_size.constant);
@@ -1675,7 +1678,6 @@ expand_call (exp, target, ignore)
       }
 
 #if defined(ACCUMULATE_OUTGOING_ARGS) && defined(REG_PARM_STACK_SPACE)
-
   /* The argument list is the property of the called routine and it
      may clobber it.  If the fixed area has been used for previous
      parameters, we must save and restore it.
@@ -2403,11 +2405,16 @@ emit_library_call VPROTO((rtx orgfun, int no_queue, enum machine_mode outmode,
       if (argvec[count].size.var)
 	abort ();
 
-      if (reg_parm_stack_space == 0 && argvec[count].partial)
+#ifndef REG_PARM_STACK_SPACE
+      if (argvec[count].partial)
 	argvec[count].size.constant -= argvec[count].partial * UNITS_PER_WORD;
+#endif
 
       if (argvec[count].reg == 0 || argvec[count].partial != 0
-	  || reg_parm_stack_space > 0)
+#ifdef REG_PARM_STACK_SPACE
+	  || 1
+#endif
+	  )
 	args_size.constant += argvec[count].size.constant;
 
       FUNCTION_ARG_ADVANCE (args_so_far, mode, (tree) 0, 1);
@@ -2429,11 +2436,12 @@ emit_library_call VPROTO((rtx orgfun, int no_queue, enum machine_mode outmode,
 			 / STACK_BYTES) * STACK_BYTES);
 #endif
 
+#ifdef REG_PARM_STACK_SPACE
   args_size.constant = MAX (args_size.constant,
 			    reg_parm_stack_space);
-
 #ifndef OUTGOING_REG_PARM_STACK_SPACE
   args_size.constant -= reg_parm_stack_space;
+#endif
 #endif
 
   if (args_size.constant > current_function_outgoing_args_size)
@@ -2453,8 +2461,7 @@ emit_library_call VPROTO((rtx orgfun, int no_queue, enum machine_mode outmode,
      evaluations to avoid this conflicting stack usage.  */
 
   needed = args_size.constant;
-
-#ifndef OUTGOING_REG_PARM_STACK_SPACE
+#if defined(REG_PARM_STACK_SPACE) && ! defined(OUTGOING_REG_PARM_STACK_SPACE)
   /* Since we will be writing into the entire argument area, the
      map must be allocated for its entire size, not just the part that
      is the responsibility of the caller.  */
@@ -2601,14 +2608,17 @@ emit_library_call VPROTO((rtx orgfun, int no_queue, enum machine_mode outmode,
 
 	  for (i = lower_bound; i < upper_bound; i++)
 	    if (stack_usage_map[i]
+#ifdef REG_PARM_STACK_SPACE
 		/* Don't store things in the fixed argument area at this point;
 		   it has already been saved.  */
-		&& i > reg_parm_stack_space)
+		&& i > reg_parm_stack_space
+#endif
+		)
 	      break;
 
 	  if (i != upper_bound)
 	    {
-	      /* We need to make a save area.  See what mode we can make it. */
+	      /* We need to make a save area.  See what mode we can make it.  */
 	      enum machine_mode save_mode
 		= mode_for_size (argvec[argnum].size.constant * BITS_PER_UNIT,
 				 MODE_INT, 1);
@@ -2621,8 +2631,7 @@ emit_library_call VPROTO((rtx orgfun, int no_queue, enum machine_mode outmode,
 	    }
 #endif
 	  emit_push_insn (val, mode, NULL_TREE, NULL_RTX, 0, partial, reg, 0,
-			  argblock, GEN_INT (argvec[argnum].offset.constant),
-			  reg_parm_stack_space);
+			  argblock, GEN_INT (argvec[argnum].offset.constant));
 
 #ifdef ACCUMULATE_OUTGOING_ARGS
 	  /* Now mark the segment we just used.  */
@@ -2895,7 +2904,10 @@ emit_library_call_value VPROTO((rtx orgfun, rtx value, int no_queue,
 
 
       if (argvec[count].reg == 0 || argvec[count].partial != 0
-	  || reg_parm_stack_space > 0)
+#ifdef REG_PARM_STACK_SPACE
+	  || 1
+#endif
+	  )
 	args_size.constant += argvec[count].size.constant;
 
       FUNCTION_ARG_ADVANCE (args_so_far, Pmode, (tree) 0, 1);
@@ -2962,11 +2974,16 @@ emit_library_call_value VPROTO((rtx orgfun, rtx value, int no_queue,
       if (argvec[count].size.var)
 	abort ();
 
-      if (reg_parm_stack_space == 0 && argvec[count].partial)
+#ifndef REG_PARM_STACK_SPACE
+      if (argvec[count].partial)
 	argvec[count].size.constant -= argvec[count].partial * UNITS_PER_WORD;
+#endif
 
       if (argvec[count].reg == 0 || argvec[count].partial != 0
-	  || reg_parm_stack_space > 0)
+#ifdef REG_PARM_STACK_SPACE
+	  || 1
+#endif
+	  )
 	args_size.constant += argvec[count].size.constant;
 
       FUNCTION_ARG_ADVANCE (args_so_far, mode, (tree) 0, 1);
@@ -2987,11 +3004,12 @@ emit_library_call_value VPROTO((rtx orgfun, rtx value, int no_queue,
 			 / STACK_BYTES) * STACK_BYTES);
 #endif
 
+#ifdef REG_PARM_STACK_SPACE
   args_size.constant = MAX (args_size.constant,
 			    reg_parm_stack_space);
-
 #ifndef OUTGOING_REG_PARM_STACK_SPACE
   args_size.constant -= reg_parm_stack_space;
+#endif
 #endif
 
   if (args_size.constant > current_function_outgoing_args_size)
@@ -3011,8 +3029,7 @@ emit_library_call_value VPROTO((rtx orgfun, rtx value, int no_queue,
      evaluations to avoid this conflicting stack usage.  */
 
   needed = args_size.constant;
-
-#ifndef OUTGOING_REG_PARM_STACK_SPACE
+#if defined(REG_PARM_STACK_SPACE) && ! defined(OUTGOING_REG_PARM_STACK_SPACE)
   /* Since we will be writing into the entire argument area, the
      map must be allocated for its entire size, not just the part that
      is the responsibility of the caller.  */
@@ -3159,14 +3176,17 @@ emit_library_call_value VPROTO((rtx orgfun, rtx value, int no_queue,
 
 	  for (i = lower_bound; i < upper_bound; i++)
 	    if (stack_usage_map[i]
+#ifdef REG_PARM_STACK_SPACE
 		/* Don't store things in the fixed argument area at this point;
 		   it has already been saved.  */
-		&& i > reg_parm_stack_space)
+		&& i > reg_parm_stack_space
+#endif
+		)
 	      break;
 
 	  if (i != upper_bound)
 	    {
-	      /* We need to make a save area.  See what mode we can make it. */
+	      /* We need to make a save area.  See what mode we can make it.  */
 	      enum machine_mode save_mode
 		= mode_for_size (argvec[argnum].size.constant * BITS_PER_UNIT,
 				 MODE_INT, 1);
@@ -3179,8 +3199,7 @@ emit_library_call_value VPROTO((rtx orgfun, rtx value, int no_queue,
 	    }
 #endif
 	  emit_push_insn (val, mode, NULL_TREE, NULL_RTX, 0, partial, reg, 0,
-			  argblock, GEN_INT (argvec[argnum].offset.constant),
-			  reg_parm_stack_space);
+			  argblock, GEN_INT (argvec[argnum].offset.constant));
 
 #ifdef ACCUMULATE_OUTGOING_ARGS
 	  /* Now mark the segment we just used.  */
@@ -3432,9 +3451,12 @@ store_one_arg (arg, argblock, may_be_alloca, variable_size, fndecl,
 
       for (i = lower_bound; i < upper_bound; i++)
 	if (stack_usage_map[i]
+#ifdef REG_PARM_STACK_SPACE
 	    /* Don't store things in the fixed argument area at this point;
 	       it has already been saved.  */
-	    && i > reg_parm_stack_space)
+	    && i > reg_parm_stack_space
+#endif
+	    )
 	  break;
 
       if (i != upper_bound)
@@ -3579,9 +3601,9 @@ store_one_arg (arg, argblock, may_be_alloca, variable_size, fndecl,
 
       /* This isn't already where we want it on the stack, so put it there.
 	 This can either be done with push or copy insns.  */
-      emit_push_insn (arg->value, arg->mode, TREE_TYPE (pval), NULL_RTX, 0,
-		      partial, reg, used - size, argblock,
-		      ARGS_SIZE_RTX (arg->offset), reg_parm_stack_space);
+      emit_push_insn (arg->value, arg->mode, TREE_TYPE (pval), NULL_RTX,
+		      0, partial, reg, used - size,
+		      argblock, ARGS_SIZE_RTX (arg->offset));
     }
   else
     {
@@ -3613,8 +3635,7 @@ store_one_arg (arg, argblock, may_be_alloca, variable_size, fndecl,
 
       emit_push_insn (arg->value, arg->mode, TREE_TYPE (pval), size_rtx,
 		      TYPE_ALIGN (TREE_TYPE (pval)) / BITS_PER_UNIT, partial,
-		      reg, excess, argblock, ARGS_SIZE_RTX (arg->offset),
-		      reg_parm_stack_space);
+		      reg, excess, argblock, ARGS_SIZE_RTX (arg->offset));
     }
 
 

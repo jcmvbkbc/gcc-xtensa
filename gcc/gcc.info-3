@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -280,7 +280,7 @@ not doing a link step.
      `-nodefaultlibs' is `libgcc.a', a library of internal subroutines
      that GNU CC uses to overcome shortcomings of particular machines,
      or special needs for some languages.  (*Note Interfacing to GNU CC
-     Output: Interface, for more discussion of `libgcc.a'.)  In most
+     Output: Interface, for more discussion of `libgcc.a'.) In most
      cases, you need `libgcc.a' even when you want to avoid other
      standard libraries.  In other words, when you specify `-nostdlib'
      or `-nodefaultlibs' you should usually specify `-lgcc' as well.

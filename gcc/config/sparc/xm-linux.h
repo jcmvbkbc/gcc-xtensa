@@ -24,3 +24,5 @@ Boston, MA 02111-1307, USA.  */
 #include <stdlib.h>
 #include <string.h>
 #endif
+
+#include <xm-linux.h>

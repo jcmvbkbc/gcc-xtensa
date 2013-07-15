@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -84,8 +84,8 @@ and includes all the necessary compilation tools and libraries.
      what your configuration is or guesses wrong.
 
      In those cases, specify the build machine's "configuration name"
-     with the `--build' option; the host and target will default to be
-     the same as the build machine.  (If you are building a
+     with the `--host' option; the host and target will default to be
+     the same as the host machine.  (If you are building a
      cross-compiler, see *Note Cross-Compiler::.)
 
      Here is an example:
@@ -461,12 +461,12 @@ and includes all the necessary compilation tools and libraries.
      This copies the files `cc1', `cpp' and `libgcc.a' to files `cc1',
      `cpp' and `libgcc.a' in the directory
      `/usr/local/lib/gcc-lib/TARGET/VERSION', which is where the
-     compiler driver program looks for them.  Here TARGET is the target
-     machine type specified when you ran `configure', and VERSION is
-     the version number of GNU CC.  This naming scheme permits various
-     versions and/or cross-compilers to coexist.  It also copies the
-     executables for compilers for other languages (e.g., `cc1plus' for
-     C++) to the same directory.
+     compiler driver program looks for them.  Here TARGET is the
+     canonicalized form of target machine type specified when you ran
+     `configure', and VERSION is the version number of GNU CC.  This
+     naming scheme permits various versions and/or cross-compilers to
+     coexist.  It also copies the executables for compilers for other
+     languages (e.g., `cc1plus' for C++) to the same directory.
 
      This also copies the driver program `xgcc' into
      `/usr/local/bin/gcc', so that it appears in typical execution
@@ -493,8 +493,13 @@ and includes all the necessary compilation tools and libraries.
      library.  All I/O functionality, special class libraries, etc., are
      provided by the C++ runtime library.
 
-     Here's one way to build and install a C++ runtime library for GNU
-     CC:
+     The standard C++ runtime library for GNU CC is called `libstdc++'.
+     An obsolescent library `libg++' may also be available, but it's
+     necessary only for older software that hasn't been converted yet;
+     if you don't know whether you need `libg++' then you probably don't
+     need it.
+
+     Here's one way to build and install `libstdc++' for GNU CC:
 
         * Build and install GNU CC, so that invoking `gcc' obtains the
           GNU CC that was just built.

@@ -1,4 +1,4 @@
-This is Info file gcc.info, produced by Makeinfo version 1.68 from the
+This is Info file gcc.info, produced by Makeinfo version 1.67 from the
 input file gcc.texi.
 
    This file documents the use and the internals of the GNU compiler.
@@ -210,8 +210,13 @@ File: gcc.info,  Node: Sun Install,  Next: VMS Install,  Prev: Cross-Compiler,  
 Installing GNU CC on the Sun
 ============================
 
-   On Solaris (version 2.1), do not use the linker or other tools in
-`/usr/ucb' to build GNU CC.  Use `/usr/ccs/bin'.
+   On Solaris, do not use the linker or other tools in `/usr/ucb' to
+build GNU CC.  Use `/usr/ccs/bin'.
+
+   If the assembler reports `Error: misaligned data' when bootstrapping,
+you are probably using an obsolete version of the GNU assembler.
+Upgrade to the latest version of GNU `binutils', or use the Solaris
+assembler.
 
    Make sure the environment variable `FLOAT_OPTION' is not set when
 you compile `libgcc.a'.  If this option were set to `f68881' when
@@ -757,9 +762,9 @@ and never pass it as an argument.
 
    ---------- Footnotes ----------
 
-   (1) The analogous feature in Fortran is called an assigned goto, but
-that name seems inappropriate in C, where one can do more than simply
-store label addresses in label variables.
+   (1)  The analogous feature in Fortran is called an assigned goto,
+but that name seems inappropriate in C, where one can do more than
+simply store label addresses in label variables.
 
 
 File: gcc.info,  Node: Nested Functions,  Next: Constructing Calls,  Prev: Labels as Values,  Up: C Extensions
