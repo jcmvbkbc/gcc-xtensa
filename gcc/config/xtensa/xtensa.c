@@ -1769,11 +1769,11 @@ xtensa_emit_call (int callop, rtx *operands)
   rtx tgt = operands[callop];
 
   if (GET_CODE (tgt) == CONST_INT)
-    sprintf (result, "call8\t0x%lx", INTVAL (tgt));
+    sprintf (result, "call%d\t0x%lx", WINDOW_SIZE, INTVAL (tgt));
   else if (register_operand (tgt, VOIDmode))
-    sprintf (result, "callx8\t%%%d", callop);
+    sprintf (result, "callx%d\t%%%d", WINDOW_SIZE, callop);
   else
-    sprintf (result, "call8\t%%%d", callop);
+    sprintf (result, "call%d\t%%%d", WINDOW_SIZE, callop);
 
   return result;
 }
@@ -2720,6 +2720,7 @@ xtensa_return_addr (int count, rtx frame)
       emit_move_insn (retaddr, gen_rtx_MEM (Pmode, addr));
     }
 
+#if TARGET_WINDOWED_ABI
   /* The 2 most-significant bits of the return address on Xtensa hold
      the register window size.  To get the real return address, these
      bits must be replaced with the high bits from some address in the
@@ -2742,6 +2743,9 @@ xtensa_return_addr (int count, rtx frame)
   /* Combine them to get the result.  */
   emit_insn (gen_iorsi3 (result, result, curaddr));
   return result;
+#else
+  return retaddr;
+#endif
 }
 
 /* Disable the use of word-sized or smaller complex modes for structures,

@@ -61,6 +61,7 @@ extern unsigned xtensa_current_frame_size;
 #define TARGET_S32C1I		XCHAL_HAVE_S32C1I
 #define TARGET_ABSOLUTE_LITERALS XSHAL_USE_ABSOLUTE_LITERALS
 #define TARGET_THREADPTR	XCHAL_HAVE_THREADPTR
+#define TARGET_WINDOWED_ABI	(XSHAL_ABI == XTHAL_ABI_WINDOWED)
 
 #define TARGET_DEFAULT \
   ((XCHAL_HAVE_L32R	? 0 : MASK_CONST16) |				\
@@ -78,7 +79,8 @@ extern unsigned xtensa_current_frame_size;
     builtin_assert ("machine=xtensa");					\
     builtin_define ("__xtensa__");					\
     builtin_define ("__XTENSA__");					\
-    builtin_define ("__XTENSA_WINDOWED_ABI__");				\
+    builtin_define (TARGET_WINDOWED_ABI ?				\
+		    "__XTENSA_WINDOWED_ABI__" : "__XTENSA_CALL0_ABI__");\
     builtin_define (TARGET_BIG_ENDIAN ? "__XTENSA_EB__" : "__XTENSA_EL__"); \
     if (!TARGET_HARD_FLOAT)						\
       builtin_define ("__XTENSA_SOFT_FLOAT__");				\
@@ -233,6 +235,7 @@ extern unsigned xtensa_current_frame_size;
    The latter must include the registers where values are returned
    and the register where structure-value addresses are passed.
    Aside from that, you can include as many other registers as you like.  */
+#if TARGET_WINDOWED_ABI
 #define CALL_USED_REGISTERS						\
 {									\
   1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1,			\
@@ -240,6 +243,15 @@ extern unsigned xtensa_current_frame_size;
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,			\
   1,									\
 }
+#else
+#define CALL_USED_REGISTERS						\
+{									\
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,			\
+  1, 1, 1,								\
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,			\
+  1,									\
+}
+#endif
 
 /* For non-leaf procedures on Xtensa processors, the allocation order
    is as specified below by REG_ALLOC_ORDER.  For leaf procedures, we
@@ -335,7 +347,11 @@ extern char xtensa_hard_regno_mode_ok[][FIRST_PSEUDO_REGISTER];
 #define STACK_POINTER_REGNUM (GP_REG_FIRST + 1)
 
 /* Base register for access to local variables of the function.  */
+#if TARGET_WINDOWED_ABI
 #define HARD_FRAME_POINTER_REGNUM (GP_REG_FIRST + 7)
+#else
+#define HARD_FRAME_POINTER_REGNUM (GP_REG_FIRST + 15)
+#endif
 
 /* The register number of the frame pointer register, which is used to
    access automatic variables in the stack frame.  For Xtensa, this
@@ -359,6 +375,7 @@ extern char xtensa_hard_regno_mode_ok[][FIRST_PSEUDO_REGISTER];
    take advantage of the possibility for variable-sized windows; instead,
    we use a fixed window size of 8.  */
 
+#if TARGET_WINDOWED_ABI
 #define INCOMING_REGNO(OUT)						\
   ((GP_REG_P (OUT) &&							\
     ((unsigned) ((OUT) - GP_REG_FIRST) >= WINDOW_SIZE)) ?		\
@@ -368,6 +385,10 @@ extern char xtensa_hard_regno_mode_ok[][FIRST_PSEUDO_REGISTER];
   ((GP_REG_P (IN) &&							\
     ((unsigned) ((IN) - GP_REG_FIRST) < WINDOW_SIZE)) ?			\
    (IN) + WINDOW_SIZE : (IN))
+#else
+#define INCOMING_REGNO(OUT) (OUT)
+#define OUTGOING_REGNO(IN) (IN)
+#endif
 
 
 /* Define the classes of registers for register constraints in the
@@ -491,7 +512,11 @@ extern const enum reg_class xtensa_regno_to_class[FIRST_PSEUDO_REGISTER];
 #define STACK_BOUNDARY 128
 
 /* Use a fixed register window size of 8.  */
+#if TARGET_WINDOWED_ABI
 #define WINDOW_SIZE 8
+#else
+#define WINDOW_SIZE 0
+#endif
 
 /* Symbolic macros for the registers used to return integer, floating
    point, and values of coprocessor and user-defined modes.  */
@@ -550,6 +575,7 @@ typedef struct xtensa_args
 
 #define NO_PROFILE_COUNTERS	1
 
+#if TARGET_WINDOWED_ABI
 #define FUNCTION_PROFILER(FILE, LABELNO) \
   do {									\
     fprintf (FILE, "\t%s\ta10, a0\n", TARGET_DENSITY ? "mov.n" : "mov"); \
@@ -561,6 +587,20 @@ typedef struct xtensa_args
     else								\
       fprintf (FILE, "\tcall8\t_mcount\n");				\
   } while (0)
+#else
+#define FUNCTION_PROFILER(FILE, LABELNO) \
+  do {									\
+    fprintf (FILE, "\t%s\ta2, a0\n", TARGET_DENSITY ? "mov.n" : "mov"); \
+    /* TODO save incoming args? */					\
+    if (flag_pic)							\
+      {									\
+	fprintf (FILE, "\tmovi\ta0, _mcount@PLT\n");			\
+	fprintf (FILE, "\tcallx0\ta0\n");				\
+      }									\
+    else								\
+      fprintf (FILE, "\tcall0\t_mcount\n");				\
+  } while (0)
+#endif
 
 /* Stack pointer value doesn't matter at exit.  */
 #define EXIT_IGNORE_STACK 1
@@ -812,8 +852,16 @@ typedef struct xtensa_args
    a MOVI and let the assembler relax it -- for the .init and .fini
    sections, the assembler knows to put the literal in the right
    place.  */
+#if TARGET_WINDOWED_ABI
 #define CRT_CALL_STATIC_FUNCTION(SECTION_OP, FUNC) \
     asm (SECTION_OP "\n\
 	movi\ta8, " USER_LABEL_PREFIX #FUNC "\n\
 	callx8\ta8\n" \
 	TEXT_SECTION_ASM_OP);
+#else
+#define CRT_CALL_STATIC_FUNCTION(SECTION_OP, FUNC) \
+    asm (SECTION_OP "\n\
+	movi\ta0, " USER_LABEL_PREFIX #FUNC "\n\
+	callx0\ta0\n" \
+	TEXT_SECTION_ASM_OP);
+#endif

@@ -1579,7 +1579,9 @@
 	(unspec_volatile:SI [(match_operand:SI 0 "const_int_operand" "i")]
 			    UNSPECV_ENTRY))]
   ""
-  "entry\tsp, %0"
+{
+  return TARGET_WINDOWED_ABI ? "entry\tsp, %0" : "addi\tsp, sp, -%0";
+}
   [(set_attr "type"	"entry")
    (set_attr "mode"	"SI")
    (set_attr "length"	"3")])
@@ -1589,7 +1591,9 @@
    (use (reg:SI A0_REG))]
   "reload_completed"
 {
-  return (TARGET_DENSITY ? "retw.n" : "retw");
+  return TARGET_WINDOWED_ABI ?
+      (TARGET_DENSITY ? "retw.n" : "retw") :
+      (TARGET_DENSITY ? "ret.n" : "ret");
 }
   [(set_attr "type"	"jump")
    (set_attr "mode"	"none")
