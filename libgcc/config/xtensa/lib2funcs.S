@@ -33,10 +33,14 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 	.global	__xtensa_libgcc_window_spill
 	.type	__xtensa_libgcc_window_spill,@function
 __xtensa_libgcc_window_spill:
+#if XCHAL_HAVE_WINDOWED && !__XTENSA_CALL0_ABI__
 	entry	sp, 32
 	movi	a2, 0
 	syscall
 	retw
+#else
+	ret
+#endif
 	.size	__xtensa_libgcc_window_spill, .-__xtensa_libgcc_window_spill
 
 
@@ -55,6 +59,7 @@ __xtensa_libgcc_window_spill:
 	.global	__xtensa_nonlocal_goto
 	.type	__xtensa_nonlocal_goto,@function
 __xtensa_nonlocal_goto:
+#if XCHAL_HAVE_WINDOWED && !__XTENSA_CALL0_ABI__
 	entry	sp, 32
 
 	/* Flush registers.  */
@@ -127,6 +132,9 @@ __xtensa_nonlocal_goto:
 	src	a0, a8, a3	/* combine them with a funnel shift */
 
 	retw
+#else
+	ret
+#endif
 	.size	__xtensa_nonlocal_goto, .-__xtensa_nonlocal_goto
 
 
@@ -154,7 +162,9 @@ __xtensa_nonlocal_goto:
 	.global	__xtensa_sync_caches
 	.type	__xtensa_sync_caches,@function
 __xtensa_sync_caches:
+#if XCHAL_HAVE_WINDOWED && !__XTENSA_CALL0_ABI__
 	entry 	sp, 32
+#endif
 #if XCHAL_DCACHE_SIZE > 0
 	/* Flush the trampoline from the data cache.  */
 	extui	a4, a2, 0, XCHAL_DCACHE_LINEWIDTH
@@ -182,5 +192,9 @@ __xtensa_sync_caches:
 	bnez	a4, .Licache_loop
 #endif
 	isync
+#if XCHAL_HAVE_WINDOWED && !__XTENSA_CALL0_ABI__
 	retw
+#else
+	ret
+#endif
 	.size	__xtensa_sync_caches, .-__xtensa_sync_caches
