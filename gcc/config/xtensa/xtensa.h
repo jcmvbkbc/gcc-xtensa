@@ -267,6 +267,7 @@ extern unsigned xtensa_current_frame_size;
    argument registers are not used until after other register choices
    have been exhausted.  */
 
+#if TARGET_WINDOWED_ABI
 #define REG_ALLOC_ORDER \
 {  8,  9, 10, 11, 12, 13, 14, 15,  7,  6,  5,  4,  3,  2, \
   18, \
@@ -274,6 +275,16 @@ extern unsigned xtensa_current_frame_size;
    0,  1, 16, 17, \
   35, \
 }
+#else
+#define REG_ALLOC_ORDER \
+{  8,  9, 10, 11,  7,  6,  5,  4,  3,  2, 12, 13, 14, 15, \
+  18, \
+  19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, \
+   0,  1, 16, 17, \
+  35, \
+}
+#endif
+
 
 #define ADJUST_REG_ALLOC_ORDER order_regs_for_local_alloc ()
 
@@ -430,6 +441,7 @@ enum reg_class
 /* Contents of the register classes.  The Nth integer specifies the
    contents of class N.  The way the integer MASK is interpreted is
    that register R is in the class if 'MASK & (1 << R)' is 1.  */
+#if TARGET_WINDOWED_ABI
 #define REG_CLASS_CONTENTS \
 { \
   { 0x00000000, 0x00000000 }, /* no registers */ \
@@ -442,6 +454,20 @@ enum reg_class
   { 0x0003ffff, 0x00000000 }, /* integer registers */ \
   { 0xffffffff, 0x0000000f }  /* all registers */ \
 }
+#else
+#define REG_CLASS_CONTENTS \
+{ \
+  { 0x00000000, 0x00000000 }, /* no registers */ \
+  { 0x00040000, 0x00000000 }, /* coprocessor boolean registers */ \
+  { 0xfff80000, 0x00000007 }, /* floating-point registers */ \
+  { 0x00000000, 0x00000008 }, /* MAC16 accumulator */ \
+  { 0x00000002, 0x00000000 }, /* stack pointer register */ \
+  { 0x00007ffd, 0x00000000 }, /* preferred reload registers */ \
+  { 0x0000fffd, 0x00000000 }, /* general-purpose registers */ \
+  { 0x0003ffff, 0x00000000 }, /* integer registers */ \
+  { 0xffffffff, 0x0000000f }  /* all registers */ \
+}
+#endif
 
 /* A C expression whose value is a register class containing hard
    register REGNO.  In general there is more that one such class;
@@ -649,7 +675,9 @@ typedef struct xtensa_args
 
 /* Define this if the return address of a particular stack frame is
    accessed from the frame pointer of the previous stack frame.  */
+#if TARGET_WINDOWED_ABI
 #define RETURN_ADDR_IN_PREVIOUS_FRAME
+#endif
 
 /* A C expression whose value is RTL representing the value of the
    return address for the frame COUNT steps up from the current

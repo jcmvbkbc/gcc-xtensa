@@ -75,6 +75,8 @@ char xtensa_hard_regno_mode_ok[(int) MAX_MACHINE_MODE][FIRST_PSEUDO_REGISTER];
 
 /* Current frame size calculated by compute_frame_size.  */
 unsigned xtensa_current_frame_size;
+/* Callee-save area size in the current frame calculated by compute_frame_size. */
+int xtensa_callee_save_size;
 
 /* Largest block move to handle in-line.  */
 #define LARGEST_MOVE_RATIO 15
@@ -105,9 +107,9 @@ const char xtensa_leaf_regs[FIRST_PSEUDO_REGISTER] =
 const enum reg_class xtensa_regno_to_class[FIRST_PSEUDO_REGISTER] =
 {
   RL_REGS,	SP_REG,		RL_REGS,	RL_REGS,
-  RL_REGS,	RL_REGS,	RL_REGS,	GR_REGS,
+  RL_REGS,	RL_REGS,	RL_REGS,	TARGET_WINDOWED_ABI ? GR_REGS : RL_REGS,
   RL_REGS,	RL_REGS,	RL_REGS,	RL_REGS,
-  RL_REGS,	RL_REGS,	RL_REGS,	RL_REGS,
+  RL_REGS,	RL_REGS,	RL_REGS,	TARGET_WINDOWED_ABI ? RL_REGS : GR_REGS,
   AR_REGS,	AR_REGS,	BR_REGS,
   FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
   FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
@@ -128,7 +130,6 @@ static rtx xtensa_legitimize_address (rtx, rtx, enum machine_mode);
 static bool xtensa_mode_dependent_address_p (const_rtx, addr_space_t);
 static bool xtensa_return_in_msb (const_tree);
 static void printx (FILE *, signed int);
-static void xtensa_function_epilogue (FILE *, HOST_WIDE_INT);
 static rtx xtensa_builtin_saveregs (void);
 static bool xtensa_legitimate_address_p (enum machine_mode, rtx, bool);
 static unsigned int xtensa_multibss_section_type_flags (tree, const char *,
@@ -180,14 +181,6 @@ static bool xtensa_member_type_forces_blk (const_tree,
 static const int reg_nonleaf_alloc_order[FIRST_PSEUDO_REGISTER] =
   REG_ALLOC_ORDER;
 
-
-/* This macro generates the assembly code for function exit,
-   on machines that need it.  If FUNCTION_EPILOGUE is not defined
-   then individual return instructions are generated for each
-   return statement.  Args are same as for FUNCTION_PROLOGUE.  */
-
-#undef TARGET_ASM_FUNCTION_EPILOGUE
-#define TARGET_ASM_FUNCTION_EPILOGUE xtensa_function_epilogue
 
 /* These hooks specify assembly directives for creating certain kinds
    of integer object.  */
@@ -466,9 +459,10 @@ xtensa_valid_move (enum machine_mode mode, rtx *operands)
 
       /* The stack pointer can only be assigned with a MOVSP opcode.  */
       if (dst_regnum == STACK_POINTER_REGNUM)
-	return (mode == SImode
-		&& register_operand (operands[1], mode)
-		&& !ACC_REG_P (xt_true_regnum (operands[1])));
+	return !TARGET_WINDOWED_ABI
+	  || (mode == SImode
+	      && register_operand (operands[1], mode)
+	      && !ACC_REG_P (xt_true_regnum (operands[1])));
 
       if (!ACC_REG_P (dst_regnum))
 	return true;
@@ -1609,9 +1603,11 @@ xtensa_setup_frame_addresses (void)
   /* Set flag to cause TARGET_FRAME_POINTER_REQUIRED to return true.  */
   cfun->machine->accesses_prev_frame = 1;
 
+#if TARGET_WINDOWED_ABI
   emit_library_call
     (gen_rtx_SYMBOL_REF (Pmode, "__xtensa_libgcc_window_spill"),
      LCT_NORMAL, VOIDmode, 0);
+#endif
 }
 
 
@@ -2599,14 +2595,26 @@ xtensa_output_literal (FILE *file, rtx x, enum machine_mode mode, int labelno)
 long
 compute_frame_size (int size)
 {
+  int regno;
+
   /* Add space for the incoming static chain value.  */
   if (cfun->static_chain_decl != NULL)
     size += (1 * UNITS_PER_WORD);
 
+  xtensa_callee_save_size = 0;
+  for (regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
+    {
+      if ((regno == A0_REG || (!fixed_regs[regno] && !call_used_regs[regno])) &&
+	  df_regs_ever_live_p (regno))
+	xtensa_callee_save_size += UNITS_PER_WORD;
+    }
+
   xtensa_current_frame_size =
     XTENSA_STACK_ALIGN (size
+			+ xtensa_callee_save_size
 			+ crtl->outgoing_args_size
 			+ (WINDOW_SIZE * UNITS_PER_WORD));
+  xtensa_callee_save_size = XTENSA_STACK_ALIGN (xtensa_callee_save_size);
   return xtensa_current_frame_size;
 }
 
@@ -2633,15 +2641,17 @@ xtensa_frame_pointer_required (void)
 void
 xtensa_expand_prologue (void)
 {
+  int regno;
   HOST_WIDE_INT total_size;
-  rtx size_rtx;
-  rtx insn, note_rtx;
+  HOST_WIDE_INT offset = 0;
+  rtx insn = NULL, note_rtx;
 
   total_size = compute_frame_size (get_frame_size ());
-  size_rtx = GEN_INT (total_size);
+
+#if TARGET_WINDOWED_ABI
 
   if (total_size < (1 << (12+3)))
-    insn = emit_insn (gen_entry (size_rtx));
+    insn = emit_insn (gen_entry (GEN_INT (total_size)));
   else
     {
       /* Use a8 as a temporary since a0-a7 may be live.  */
@@ -2651,6 +2661,52 @@ xtensa_expand_prologue (void)
       emit_insn (gen_subsi3 (tmp_reg, stack_pointer_rtx, tmp_reg));
       insn = emit_insn (gen_movsi (stack_pointer_rtx, tmp_reg));
     }
+#else
+  /* -128 is a limit of single addi instruction. */
+  if (total_size > 0 && total_size <= 128)
+    {
+      insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
+				    GEN_INT (-total_size)));
+      offset = total_size - UNITS_PER_WORD;
+    }
+  else if (xtensa_callee_save_size)
+    {
+      /* 1020 is maximal s32i offset, if the frame is bigger than that
+       * we move sp to the end of callee-saved save area, save and then
+       * move it to its final location. */
+      if (total_size > 1024)
+        {
+	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
+					GEN_INT (-xtensa_callee_save_size)));
+	  offset = xtensa_callee_save_size - UNITS_PER_WORD;
+	}
+      else
+        {
+	  rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
+	  emit_move_insn (tmp_reg, GEN_INT (-total_size));
+	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
+	  offset = total_size - UNITS_PER_WORD;
+	}
+    }
+
+  for (regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
+    {
+      if ((regno == A0_REG || (!fixed_regs[regno] && !call_used_regs[regno])) &&
+	  df_regs_ever_live_p (regno))
+        {
+	  rtx x = gen_rtx_PLUS (Pmode, stack_pointer_rtx, GEN_INT (offset));
+
+	  offset -= UNITS_PER_WORD;
+	  emit_move_insn (gen_frame_mem (SImode, x), gen_rtx_REG (SImode, regno));
+	}
+    }
+  if (total_size > 1024)
+    {
+      rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
+      emit_move_insn (tmp_reg, GEN_INT (xtensa_callee_save_size - total_size));
+      insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
+    }
+#endif
 
   if (frame_pointer_needed)
     {
@@ -2682,33 +2738,101 @@ xtensa_expand_prologue (void)
 				     stack_pointer_rtx));
     }
 
-  /* Create a note to describe the CFA.  Because this is only used to set
-     DW_AT_frame_base for debug info, don't bother tracking changes through
-     each instruction in the prologue.  It just takes up space.  */
-  note_rtx = gen_rtx_SET (VOIDmode, (frame_pointer_needed
-				     ? hard_frame_pointer_rtx
-				     : stack_pointer_rtx),
-			  plus_constant (Pmode, stack_pointer_rtx,
-					 -total_size));
-  RTX_FRAME_RELATED_P (insn) = 1;
-  add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
+  if (TARGET_WINDOWED_ABI || total_size > 0)
+    {
+      /* Create a note to describe the CFA.  Because this is only used to set
+	 DW_AT_frame_base for debug info, don't bother tracking changes through
+	 each instruction in the prologue.  It just takes up space.  */
+      note_rtx = gen_rtx_SET (VOIDmode, (frame_pointer_needed
+					 ? hard_frame_pointer_rtx
+					 : stack_pointer_rtx),
+			      plus_constant (Pmode, stack_pointer_rtx,
+					     -total_size));
+      RTX_FRAME_RELATED_P (insn) = 1;
+      add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
+    }
 }
-
-
-/* Clear variables at function end.  */
 
 void
-xtensa_function_epilogue (FILE *file ATTRIBUTE_UNUSED,
-			  HOST_WIDE_INT size ATTRIBUTE_UNUSED)
+xtensa_expand_epilogue (void)
 {
-  xtensa_current_frame_size = 0;
-}
+#if !TARGET_WINDOWED_ABI
+  int regno;
+  rtx insn;
+  HOST_WIDE_INT offset;
 
+  if (xtensa_current_frame_size > (frame_pointer_needed ? 127 : 1024))
+    {
+      rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
+      emit_move_insn (tmp_reg, GEN_INT (xtensa_current_frame_size -
+					xtensa_callee_save_size));
+      insn = emit_insn (gen_addsi3 (stack_pointer_rtx, frame_pointer_needed ?
+				    hard_frame_pointer_rtx : stack_pointer_rtx, tmp_reg));
+      offset = xtensa_callee_save_size - UNITS_PER_WORD;
+    }
+  else
+    {
+      if (frame_pointer_needed)
+	emit_move_insn (stack_pointer_rtx, hard_frame_pointer_rtx);
+      offset = xtensa_current_frame_size - UNITS_PER_WORD;
+    }
+
+  for (regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
+    {
+      if ((regno == A0_REG || (!fixed_regs[regno] && !call_used_regs[regno])) &&
+	  df_regs_ever_live_p (regno))
+        {
+	  rtx x = gen_rtx_PLUS (Pmode, stack_pointer_rtx, GEN_INT (offset));
+
+	  offset -= UNITS_PER_WORD;
+	  emit_move_insn (gen_rtx_REG (SImode, regno), gen_frame_mem (SImode, x));
+	}
+    }
+
+  if (xtensa_current_frame_size > 0)
+    {
+      rtx note_rtx;
+
+      if (frame_pointer_needed || /* always reachable with addi */
+	  xtensa_current_frame_size > 1024 ||
+	  xtensa_current_frame_size <= 127)
+	{
+	  if (xtensa_current_frame_size <= 127)
+	    offset = xtensa_current_frame_size;
+	  else
+	    offset = xtensa_callee_save_size;
+
+	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
+					GEN_INT (offset)));
+	}
+      else
+	{
+	  rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
+	  emit_move_insn (tmp_reg, GEN_INT (xtensa_current_frame_size));
+	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
+	}
+
+      /* Create a note to describe the CFA.  Because this is only used to set
+	 DW_AT_frame_base for debug info, don't bother tracking changes through
+	 each instruction in the prologue.  It just takes up space.  */
+      note_rtx = gen_rtx_SET (VOIDmode, stack_pointer_rtx,
+			      plus_constant (Pmode, frame_pointer_needed
+					     ? hard_frame_pointer_rtx
+					     : stack_pointer_rtx,
+					     xtensa_current_frame_size));
+      RTX_FRAME_RELATED_P (insn) = 1;
+      add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
+    }
+#endif
+  xtensa_current_frame_size = 0;
+  xtensa_callee_save_size = 0;
+  emit_jump_insn (gen_return ());
+}
 
 rtx
 xtensa_return_addr (int count, rtx frame)
 {
-  rtx result, retaddr, curaddr, label;
+  rtx retaddr;
 
   if (count == -1)
     retaddr = gen_rtx_REG (Pmode, A0_REG);
@@ -2721,28 +2845,31 @@ xtensa_return_addr (int count, rtx frame)
     }
 
 #if TARGET_WINDOWED_ABI
-  /* The 2 most-significant bits of the return address on Xtensa hold
-     the register window size.  To get the real return address, these
-     bits must be replaced with the high bits from some address in the
-     code.  */
+  {
+    rtx result, curaddr, label;
+    /* The 2 most-significant bits of the return address on Xtensa hold
+       the register window size.  To get the real return address, these
+       bits must be replaced with the high bits from some address in the
+       code.  */
 
-  /* Get the 2 high bits of a local label in the code.  */
-  curaddr = gen_reg_rtx (Pmode);
-  label = gen_label_rtx ();
-  emit_label (label);
-  LABEL_PRESERVE_P (label) = 1;
-  emit_move_insn (curaddr, gen_rtx_LABEL_REF (Pmode, label));
-  emit_insn (gen_lshrsi3 (curaddr, curaddr, GEN_INT (30)));
-  emit_insn (gen_ashlsi3 (curaddr, curaddr, GEN_INT (30)));
+    /* Get the 2 high bits of a local label in the code.  */
+    curaddr = gen_reg_rtx (Pmode);
+    label = gen_label_rtx ();
+    emit_label (label);
+    LABEL_PRESERVE_P (label) = 1;
+    emit_move_insn (curaddr, gen_rtx_LABEL_REF (Pmode, label));
+    emit_insn (gen_lshrsi3 (curaddr, curaddr, GEN_INT (30)));
+    emit_insn (gen_ashlsi3 (curaddr, curaddr, GEN_INT (30)));
 
-  /* Clear the 2 high bits of the return address.  */
-  result = gen_reg_rtx (Pmode);
-  emit_insn (gen_ashlsi3 (result, retaddr, GEN_INT (2)));
-  emit_insn (gen_lshrsi3 (result, result, GEN_INT (2)));
+    /* Clear the 2 high bits of the return address.  */
+    result = gen_reg_rtx (Pmode);
+    emit_insn (gen_ashlsi3 (result, retaddr, GEN_INT (2)));
+    emit_insn (gen_lshrsi3 (result, result, GEN_INT (2)));
 
-  /* Combine them to get the result.  */
-  emit_insn (gen_iorsi3 (result, result, curaddr));
-  return result;
+    /* Combine them to get the result.  */
+    emit_insn (gen_iorsi3 (result, result, curaddr));
+    return result;
+  }
 #else
   return retaddr;
 #endif

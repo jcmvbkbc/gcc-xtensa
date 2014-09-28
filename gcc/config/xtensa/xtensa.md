@@ -24,6 +24,7 @@
   (A1_REG		1)
   (A7_REG		7)
   (A8_REG		8)
+  (A9_REG		9)
 
   (UNSPEC_NOP		2)
   (UNSPEC_PLT		3)
@@ -91,6 +92,15 @@
 
 (define_attr "length" "" (const_int 1))
 
+(define_attr "abi" "windowed,call0" (const_string "windowed"))
+
+(define_attr "enabled" ""
+ (cond [(eq_attr "abi" "windowed") (const_int 1)
+  (and (eq_attr "abi" "call0")
+   (ne (symbol_ref "TARGET_WINDOWED_ABI") (const_int 1)))
+  (const_int 1)]
+  (const_int 0))
+ )
 ;; Describe a user's asm statement.
 (define_asm_attributes
   [(set_attr "type" "multi")])
@@ -141,19 +151,25 @@
 ;; Addition.
 
 (define_insn "addsi3"
-  [(set (match_operand:SI 0 "register_operand" "=D,D,a,a,a")
-	(plus:SI (match_operand:SI 1 "register_operand" "%d,d,r,r,r")
-		 (match_operand:SI 2 "add_operand" "d,O,r,J,N")))]
+  [(set (match_operand:SI 0 "register_operand" "=D,D,r,r,r,q,q,q,q,q")
+	(plus:SI (match_operand:SI 1 "register_operand" "%d,d,r,r,r,d,d,r,r,r")
+		 (match_operand:SI 2 "add_operand" "d,O,r,J,N,d,O,r,J,N")))]
   ""
   "@
    add.n\t%0, %1, %2
    addi.n\t%0, %1, %d2
    add\t%0, %1, %2
    addi\t%0, %1, %d2
+   addmi\t%0, %1, %x2
+   add.n\t%0, %1, %2
+   addi.n\t%0, %1, %d2
+   add\t%0, %1, %2
+   addi\t%0, %1, %d2
    addmi\t%0, %1, %x2"
-  [(set_attr "type"	"arith,arith,arith,arith,arith")
+  [(set_attr "type"	"arith,arith,arith,arith,arith,arith,arith,arith,arith,arith")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"2,2,3,3,3")])
+   (set_attr "length"	"2,2,3,3,3,2,2,3,3,3")
+   (set_attr "abi"	"*,*,*,*,*,call0,call0,call0,call0,call0")])
 
 (define_insn "*addx"
   [(set (match_operand:SI 0 "register_operand" "=a")
@@ -799,8 +815,8 @@
 })
 
 (define_insn "movsi_internal"
-  [(set (match_operand:SI 0 "nonimmed_operand" "=D,D,D,D,R,R,a,q,a,W,a,a,U,*a,*A")
-	(match_operand:SI 1 "move_operand" "M,D,d,R,D,d,r,r,I,i,T,U,r,*A,*r"))]
+  [(set (match_operand:SI 0 "nonimmed_operand" "=D,D,D,D,R,R,a,q,q,a,W,a,a,U,*a,*A")
+	(match_operand:SI 1 "move_operand" "M,D,d,R,D,d,r,r,r,I,i,T,U,r,*A,*r"))]
   "xtensa_valid_move (SImode, operands)"
   "@
    movi.n\t%0, %x1
@@ -810,6 +826,7 @@
    %v0s32i.n\t%1, %0
    %v0s32i.n\t%1, %0
    mov\t%0, %1
+   mov\t%0, %1
    movsp\t%0, %1
    movi\t%0, %x1
    const16\t%0, %t1\;const16\t%0, %b1
@@ -818,9 +835,9 @@
    %v0s32i\t%1, %0
    rsr\t%0, ACCLO
    wsr\t%1, ACCLO"
-  [(set_attr "type" "move,move,move,load,store,store,move,move,move,move,load,load,store,rsr,wsr")
+  [(set_attr "type" "move,move,move,load,store,store,move,move,move,move,move,load,load,store,rsr,wsr")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"2,2,2,2,2,2,3,3,3,6,3,3,3,3,3")])
+   (set_attr "length"	"2,2,2,2,2,2,3,3,3,3,6,3,3,3,3,3")])
 
 ;; 16-bit Integer moves
 
@@ -1525,8 +1542,9 @@
   "")
 
 (define_expand "call"
-  [(call (match_operand 0 "memory_operand" "")
-	 (match_operand 1 "" ""))]
+  [(parallel [(call (match_operand 0 "memory_operand" "")
+	            (match_operand 1 "" ""))
+              (clobber (reg:SI A0_REG))])]
   ""
 {
   rtx addr = XEXP (operands[0], 0);
@@ -1539,7 +1557,8 @@
 
 (define_insn "call_internal"
   [(call (mem (match_operand:SI 0 "call_insn_operand" "nir"))
-	 (match_operand 1 "" "i"))]
+	 (match_operand 1 "" "i"))
+   (clobber (reg:SI A0_REG))]
   ""
 {
   return xtensa_emit_call (0, operands);
@@ -1549,9 +1568,10 @@
    (set_attr "length"	"3")])
 
 (define_expand "call_value"
-  [(set (match_operand 0 "register_operand" "")
-	(call (match_operand 1 "memory_operand" "")
-	      (match_operand 2 "" "")))]
+  [(parallel [(set (match_operand 0 "register_operand" "")
+	           (call (match_operand 1 "memory_operand" "")
+		         (match_operand 2 "" "")))
+              (clobber (reg:SI A0_REG))])]
   ""
 {
   rtx addr = XEXP (operands[1], 0);
@@ -1565,7 +1585,8 @@
 (define_insn "call_value_internal"
   [(set (match_operand 0 "register_operand" "=a")
         (call (mem (match_operand:SI 1 "call_insn_operand" "nir"))
-              (match_operand 2 "" "i")))]
+              (match_operand 2 "" "i")))
+   (clobber (reg:SI A0_REG))]
   ""
 {
   return xtensa_emit_call (1, operands);
@@ -1589,7 +1610,7 @@
 (define_insn "return"
   [(return)
    (use (reg:SI A0_REG))]
-  "reload_completed"
+  "(TARGET_WINDOWED_ABI || !xtensa_current_frame_size) && reload_completed"
 {
   return TARGET_WINDOWED_ABI ?
       (TARGET_DENSITY ? "retw.n" : "retw") :
@@ -1614,7 +1635,7 @@
   [(return)]
   ""
 {
-  emit_jump_insn (gen_return ());
+  xtensa_expand_epilogue ();
   DONE;
 })
 
