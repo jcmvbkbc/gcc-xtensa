@@ -832,7 +832,7 @@ typedef struct xtensa_args
 /* Define output to appear before the constant pool.  */
 #define ASM_OUTPUT_POOL_PROLOGUE(FILE, FUNNAME, FUNDECL, SIZE)          \
   do {									\
-    if ((SIZE) > 0)							\
+    if ((SIZE) > 0 || !TARGET_WINDOWED_ABI)				\
       {									\
 	resolve_unique_section ((FUNDECL), 0, flag_function_sections);	\
 	switch_to_section (function_section (FUNDECL));			\
