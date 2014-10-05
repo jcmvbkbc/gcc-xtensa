@@ -196,14 +196,15 @@
 ;; Subtraction.
 
 (define_insn "subsi3"
-  [(set (match_operand:SI 0 "register_operand" "=a")
-        (minus:SI (match_operand:SI 1 "register_operand" "r")
-		  (match_operand:SI 2 "register_operand" "r")))]
+  [(set (match_operand:SI 0 "register_operand" "=a,q")
+        (minus:SI (match_operand:SI 1 "register_operand" "r,r")
+		  (match_operand:SI 2 "register_operand" "r,r")))]
   ""
   "sub\t%0, %1, %2"
-  [(set_attr "type"	"arith")
+  [(set_attr "type"	"arith,arith")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"3")])
+   (set_attr "length"	"3,3")
+   (set_attr "abi"	"*,call0")])
 
 (define_insn "*subx"
   [(set (match_operand:SI 0 "register_operand" "=a")

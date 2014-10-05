@@ -2683,8 +2683,8 @@ xtensa_expand_prologue (void)
       else
         {
 	  rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
-	  emit_move_insn (tmp_reg, GEN_INT (-total_size));
-	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
+	  emit_move_insn (tmp_reg, GEN_INT (total_size));
+	  insn = emit_insn (gen_subsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
 	  offset = total_size - UNITS_PER_WORD;
 	}
     }
@@ -2703,8 +2703,8 @@ xtensa_expand_prologue (void)
   if (total_size > 1024)
     {
       rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
-      emit_move_insn (tmp_reg, GEN_INT (xtensa_callee_save_size - total_size));
-      insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
+      emit_move_insn (tmp_reg, GEN_INT (total_size - xtensa_callee_save_size));
+      insn = emit_insn (gen_subsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
     }
 #endif
 
