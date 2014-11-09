@@ -2118,7 +2118,7 @@ xtensa_function_arg_1 (cumulative_args_t cum_v, enum machine_mode mode,
   regno = regbase + *arg_words;
 
   if (cum->incoming && regno <= A7_REG && regno + words > A7_REG)
-    cfun->machine->need_a7_copy = true;
+    cfun->machine->need_a7_copy = TARGET_WINDOWED_ABI;
 
   return gen_rtx_REG (mode, regno);
 }
@@ -2957,14 +2957,14 @@ xtensa_builtin_saveregs (void)
   set_mem_alias_set (gp_regs, get_varargs_alias_set ());
 
   /* Now store the incoming registers.  */
-  cfun->machine->need_a7_copy = true;
+  cfun->machine->need_a7_copy = TARGET_WINDOWED_ABI;
   cfun->machine->vararg_a7 = true;
   move_block_from_reg (GP_ARG_FIRST + arg_words,
 		       adjust_address (gp_regs, BLKmode,
 				       arg_words * UNITS_PER_WORD),
 		       gp_left);
-  gcc_assert (cfun->machine->vararg_a7_copy != 0);
-  emit_insn_before (cfun->machine->vararg_a7_copy, get_insns ());
+  if (cfun->machine->vararg_a7_copy != 0)
+    emit_insn_before (cfun->machine->vararg_a7_copy, get_insns ());
 
   return XEXP (gp_regs, 0);
 }
