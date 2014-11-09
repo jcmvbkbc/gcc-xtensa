@@ -601,32 +601,17 @@ typedef struct xtensa_args
 
 #define NO_PROFILE_COUNTERS	1
 
-#if TARGET_WINDOWED_ABI
 #define FUNCTION_PROFILER(FILE, LABELNO) \
   do {									\
     fprintf (FILE, "\t%s\ta10, a0\n", TARGET_DENSITY ? "mov.n" : "mov"); \
     if (flag_pic)							\
       {									\
-	fprintf (FILE, "\tmovi\ta8, _mcount@PLT\n");			\
-	fprintf (FILE, "\tcallx8\ta8\n");				\
+	fprintf (FILE, "\tmovi\ta%d, _mcount@PLT\n", WINDOW_SIZE);	\
+	fprintf (FILE, "\tcallx%d\ta%d\n", WINDOW_SIZE, WINDOW_SIZE);	\
       }									\
     else								\
-      fprintf (FILE, "\tcall8\t_mcount\n");				\
+      fprintf (FILE, "\tcall%d\t_mcount\n", WINDOW_SIZE);		\
   } while (0)
-#else
-#define FUNCTION_PROFILER(FILE, LABELNO) \
-  do {									\
-    fprintf (FILE, "\t%s\ta2, a0\n", TARGET_DENSITY ? "mov.n" : "mov"); \
-    /* TODO save incoming args? */					\
-    if (flag_pic)							\
-      {									\
-	fprintf (FILE, "\tmovi\ta0, _mcount@PLT\n");			\
-	fprintf (FILE, "\tcallx0\ta0\n");				\
-      }									\
-    else								\
-      fprintf (FILE, "\tcall0\t_mcount\n");				\
-  } while (0)
-#endif
 
 /* Stack pointer value doesn't matter at exit.  */
 #define EXIT_IGNORE_STACK 1
