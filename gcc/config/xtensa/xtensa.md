@@ -1655,7 +1655,7 @@
    (match_operand:SI 1 "general_operand" "")
    (match_operand:SI 2 "general_operand" "")
    (match_operand:SI 3 "" "")]
-  ""
+  "TARGET_WINDOWED_ABI"
 {
   xtensa_expand_nonlocal_goto (operands);
   DONE;

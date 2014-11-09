@@ -29,19 +29,17 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    current register window.  This is used to set up the stack so that
    arbitrary frames can be accessed.  */
 
+#if XCHAL_HAVE_WINDOWED && !__XTENSA_CALL0_ABI__
 	.align	4
 	.global	__xtensa_libgcc_window_spill
 	.type	__xtensa_libgcc_window_spill,@function
 __xtensa_libgcc_window_spill:
-#if XCHAL_HAVE_WINDOWED && !__XTENSA_CALL0_ABI__
 	entry	sp, 32
 	movi	a2, 0
 	syscall
 	retw
-#else
-	ret
-#endif
 	.size	__xtensa_libgcc_window_spill, .-__xtensa_libgcc_window_spill
+#endif
 
 
 /* __xtensa_nonlocal_goto: This code does all the hard work of a
@@ -55,11 +53,11 @@ __xtensa_libgcc_window_spill:
   This function never returns to its caller but instead goes directly
   to the address of the specified goto handler.  */
 
+#if XCHAL_HAVE_WINDOWED && !__XTENSA_CALL0_ABI__
 	.align	4
 	.global	__xtensa_nonlocal_goto
 	.type	__xtensa_nonlocal_goto,@function
 __xtensa_nonlocal_goto:
-#if XCHAL_HAVE_WINDOWED && !__XTENSA_CALL0_ABI__
 	entry	sp, 32
 
 	/* Flush registers.  */
@@ -132,10 +130,8 @@ __xtensa_nonlocal_goto:
 	src	a0, a8, a3	/* combine them with a funnel shift */
 
 	retw
-#else
-	ret
-#endif
 	.size	__xtensa_nonlocal_goto, .-__xtensa_nonlocal_goto
+#endif
 
 
 /* __xtensa_sync_caches: This function is called after writing a trampoline
