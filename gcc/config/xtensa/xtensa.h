@@ -358,11 +358,8 @@ extern char xtensa_hard_regno_mode_ok[][FIRST_PSEUDO_REGISTER];
 #define STACK_POINTER_REGNUM (GP_REG_FIRST + 1)
 
 /* Base register for access to local variables of the function.  */
-#if TARGET_WINDOWED_ABI
-#define HARD_FRAME_POINTER_REGNUM (GP_REG_FIRST + 7)
-#else
-#define HARD_FRAME_POINTER_REGNUM (GP_REG_FIRST + 15)
-#endif
+#define HARD_FRAME_POINTER_REGNUM (GP_REG_FIRST + \
+				   (TARGET_WINDOWED_ABI ? 7 : 15))
 
 /* The register number of the frame pointer register, which is used to
    access automatic variables in the stack frame.  For Xtensa, this
@@ -538,11 +535,7 @@ extern const enum reg_class xtensa_regno_to_class[FIRST_PSEUDO_REGISTER];
 #define STACK_BOUNDARY 128
 
 /* Use a fixed register window size of 8.  */
-#if TARGET_WINDOWED_ABI
-#define WINDOW_SIZE 8
-#else
-#define WINDOW_SIZE 0
-#endif
+#define WINDOW_SIZE (TARGET_WINDOWED_ABI ? 8 : 0)
 
 /* Symbolic macros for the registers used to return integer, floating
    point, and values of coprocessor and user-defined modes.  */

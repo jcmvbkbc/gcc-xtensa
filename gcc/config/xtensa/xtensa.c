@@ -1603,11 +1603,10 @@ xtensa_setup_frame_addresses (void)
   /* Set flag to cause TARGET_FRAME_POINTER_REQUIRED to return true.  */
   cfun->machine->accesses_prev_frame = 1;
 
-#if TARGET_WINDOWED_ABI
-  emit_library_call
-    (gen_rtx_SYMBOL_REF (Pmode, "__xtensa_libgcc_window_spill"),
-     LCT_NORMAL, VOIDmode, 0);
-#endif
+  if (TARGET_WINDOWED_ABI)
+    emit_library_call
+      (gen_rtx_SYMBOL_REF (Pmode, "__xtensa_libgcc_window_spill"),
+       LCT_NORMAL, VOIDmode, 0);
 }
 
 
@@ -2659,64 +2658,66 @@ xtensa_expand_prologue (void)
 
   total_size = compute_frame_size (get_frame_size ());
 
-#if TARGET_WINDOWED_ABI
-
-  if (total_size < (1 << (12+3)))
-    insn = emit_insn (gen_entry (GEN_INT (total_size)));
+  if (TARGET_WINDOWED_ABI)
+    {
+      if (total_size < (1 << (12+3)))
+	insn = emit_insn (gen_entry (GEN_INT (total_size)));
+      else
+	{
+	  /* Use a8 as a temporary since a0-a7 may be live.  */
+	  rtx tmp_reg = gen_rtx_REG (Pmode, A8_REG);
+	  emit_insn (gen_entry (GEN_INT (MIN_FRAME_SIZE)));
+	  emit_move_insn (tmp_reg, GEN_INT (total_size - MIN_FRAME_SIZE));
+	  emit_insn (gen_subsi3 (tmp_reg, stack_pointer_rtx, tmp_reg));
+	  insn = emit_insn (gen_movsi (stack_pointer_rtx, tmp_reg));
+	}
+    }
   else
     {
-      /* Use a8 as a temporary since a0-a7 may be live.  */
-      rtx tmp_reg = gen_rtx_REG (Pmode, A8_REG);
-      emit_insn (gen_entry (GEN_INT (MIN_FRAME_SIZE)));
-      emit_move_insn (tmp_reg, GEN_INT (total_size - MIN_FRAME_SIZE));
-      emit_insn (gen_subsi3 (tmp_reg, stack_pointer_rtx, tmp_reg));
-      insn = emit_insn (gen_movsi (stack_pointer_rtx, tmp_reg));
-    }
-#else
-  /* -128 is a limit of single addi instruction. */
-  if (total_size > 0 && total_size <= 128)
-    {
-      insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
-				    GEN_INT (-total_size)));
-      offset = total_size - UNITS_PER_WORD;
-    }
-  else if (xtensa_callee_save_size)
-    {
-      /* 1020 is maximal s32i offset, if the frame is bigger than that
-       * we move sp to the end of callee-saved save area, save and then
-       * move it to its final location. */
-      if (total_size > 1024)
-        {
+      /* -128 is a limit of single addi instruction. */
+      if (total_size > 0 && total_size <= 128)
+	{
 	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
-					GEN_INT (-xtensa_callee_save_size)));
-	  offset = xtensa_callee_save_size - UNITS_PER_WORD;
-	}
-      else
-        {
-	  rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
-	  emit_move_insn (tmp_reg, GEN_INT (total_size));
-	  insn = emit_insn (gen_subsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
+					GEN_INT (-total_size)));
 	  offset = total_size - UNITS_PER_WORD;
 	}
-    }
+      else if (xtensa_callee_save_size)
+	{
+	  /* 1020 is maximal s32i offset, if the frame is bigger than that
+	   * we move sp to the end of callee-saved save area, save and then
+	   * move it to its final location. */
+	  if (total_size > 1024)
+	    {
+	      insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
+					    GEN_INT (-xtensa_callee_save_size)));
+	      offset = xtensa_callee_save_size - UNITS_PER_WORD;
+	    }
+	  else
+	    {
+	      rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
+	      emit_move_insn (tmp_reg, GEN_INT (total_size));
+	      insn = emit_insn (gen_subsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
+	      offset = total_size - UNITS_PER_WORD;
+	    }
+	}
 
-  for (regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
-    {
-      if (xtensa_call_save_reg(regno))
-        {
-	  rtx x = gen_rtx_PLUS (Pmode, stack_pointer_rtx, GEN_INT (offset));
+      for (regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
+	{
+	  if (xtensa_call_save_reg(regno))
+	    {
+	      rtx x = gen_rtx_PLUS (Pmode, stack_pointer_rtx, GEN_INT (offset));
 
-	  offset -= UNITS_PER_WORD;
-	  emit_move_insn (gen_frame_mem (SImode, x), gen_rtx_REG (SImode, regno));
+	      offset -= UNITS_PER_WORD;
+	      emit_move_insn (gen_frame_mem (SImode, x), gen_rtx_REG (SImode, regno));
+	    }
+	}
+      if (total_size > 1024)
+	{
+	  rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
+	  emit_move_insn (tmp_reg, GEN_INT (total_size - xtensa_callee_save_size));
+	  insn = emit_insn (gen_subsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
 	}
     }
-  if (total_size > 1024)
-    {
-      rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
-      emit_move_insn (tmp_reg, GEN_INT (total_size - xtensa_callee_save_size));
-      insn = emit_insn (gen_subsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
-    }
-#endif
 
   if (frame_pointer_needed)
     {
@@ -2766,73 +2767,74 @@ xtensa_expand_prologue (void)
 void
 xtensa_expand_epilogue (void)
 {
-#if !TARGET_WINDOWED_ABI
-  int regno;
-  rtx insn;
-  HOST_WIDE_INT offset;
-
-  if (xtensa_current_frame_size > (frame_pointer_needed ? 127 : 1024))
+  if (!TARGET_WINDOWED_ABI)
     {
-      rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
-      emit_move_insn (tmp_reg, GEN_INT (xtensa_current_frame_size -
-					xtensa_callee_save_size));
-      insn = emit_insn (gen_addsi3 (stack_pointer_rtx, frame_pointer_needed ?
-				    hard_frame_pointer_rtx : stack_pointer_rtx, tmp_reg));
-      offset = xtensa_callee_save_size - UNITS_PER_WORD;
-    }
-  else
-    {
-      if (frame_pointer_needed)
-	emit_move_insn (stack_pointer_rtx, hard_frame_pointer_rtx);
-      offset = xtensa_current_frame_size - UNITS_PER_WORD;
-    }
+      int regno;
+      rtx insn;
+      HOST_WIDE_INT offset;
 
-  for (regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
-    {
-      if (xtensa_call_save_reg(regno))
-        {
-	  rtx x = gen_rtx_PLUS (Pmode, stack_pointer_rtx, GEN_INT (offset));
-
-	  offset -= UNITS_PER_WORD;
-	  emit_move_insn (gen_rtx_REG (SImode, regno), gen_frame_mem (SImode, x));
-	}
-    }
-
-  if (xtensa_current_frame_size > 0)
-    {
-      rtx note_rtx;
-
-      if (frame_pointer_needed || /* always reachable with addi */
-	  xtensa_current_frame_size > 1024 ||
-	  xtensa_current_frame_size <= 127)
+      if (xtensa_current_frame_size > (frame_pointer_needed ? 127 : 1024))
 	{
-	  if (xtensa_current_frame_size <= 127)
-	    offset = xtensa_current_frame_size;
-	  else
-	    offset = xtensa_callee_save_size;
-
-	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
-					GEN_INT (offset)));
+	  rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
+	  emit_move_insn (tmp_reg, GEN_INT (xtensa_current_frame_size -
+					    xtensa_callee_save_size));
+	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, frame_pointer_needed ?
+					hard_frame_pointer_rtx : stack_pointer_rtx, tmp_reg));
+	  offset = xtensa_callee_save_size - UNITS_PER_WORD;
 	}
       else
 	{
-	  rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
-	  emit_move_insn (tmp_reg, GEN_INT (xtensa_current_frame_size));
-	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
+	  if (frame_pointer_needed)
+	    emit_move_insn (stack_pointer_rtx, hard_frame_pointer_rtx);
+	  offset = xtensa_current_frame_size - UNITS_PER_WORD;
 	}
 
-      /* Create a note to describe the CFA.  Because this is only used to set
-	 DW_AT_frame_base for debug info, don't bother tracking changes through
-	 each instruction in the prologue.  It just takes up space.  */
-      note_rtx = gen_rtx_SET (VOIDmode, stack_pointer_rtx,
-			      plus_constant (Pmode, frame_pointer_needed
-					     ? hard_frame_pointer_rtx
-					     : stack_pointer_rtx,
-					     xtensa_current_frame_size));
-      RTX_FRAME_RELATED_P (insn) = 1;
-      add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
+      for (regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
+	{
+	  if (xtensa_call_save_reg(regno))
+	    {
+	      rtx x = gen_rtx_PLUS (Pmode, stack_pointer_rtx, GEN_INT (offset));
+
+	      offset -= UNITS_PER_WORD;
+	      emit_move_insn (gen_rtx_REG (SImode, regno), gen_frame_mem (SImode, x));
+	    }
+	}
+
+      if (xtensa_current_frame_size > 0)
+	{
+	  rtx note_rtx;
+
+	  if (frame_pointer_needed || /* always reachable with addi */
+	      xtensa_current_frame_size > 1024 ||
+	      xtensa_current_frame_size <= 127)
+	    {
+	      if (xtensa_current_frame_size <= 127)
+		offset = xtensa_current_frame_size;
+	      else
+		offset = xtensa_callee_save_size;
+
+	      insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
+					    GEN_INT (offset)));
+	    }
+	  else
+	    {
+	      rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
+	      emit_move_insn (tmp_reg, GEN_INT (xtensa_current_frame_size));
+	      insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
+	    }
+
+	  /* Create a note to describe the CFA.  Because this is only used to set
+	     DW_AT_frame_base for debug info, don't bother tracking changes through
+	     each instruction in the prologue.  It just takes up space.  */
+	  note_rtx = gen_rtx_SET (VOIDmode, stack_pointer_rtx,
+				  plus_constant (Pmode, frame_pointer_needed
+						 ? hard_frame_pointer_rtx
+						 : stack_pointer_rtx,
+						 xtensa_current_frame_size));
+	  RTX_FRAME_RELATED_P (insn) = 1;
+	  add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
+	}
     }
-#endif
   xtensa_current_frame_size = 0;
   xtensa_callee_save_size = 0;
   emit_jump_insn (gen_return ());
@@ -2853,35 +2855,34 @@ xtensa_return_addr (int count, rtx frame)
       emit_move_insn (retaddr, gen_rtx_MEM (Pmode, addr));
     }
 
-#if TARGET_WINDOWED_ABI
-  {
-    rtx result, curaddr, label;
-    /* The 2 most-significant bits of the return address on Xtensa hold
-       the register window size.  To get the real return address, these
-       bits must be replaced with the high bits from some address in the
-       code.  */
+  if (TARGET_WINDOWED_ABI)
+    {
+      rtx result, curaddr, label;
+      /* The 2 most-significant bits of the return address on Xtensa hold
+	 the register window size.  To get the real return address, these
+	 bits must be replaced with the high bits from some address in the
+	 code.  */
 
-    /* Get the 2 high bits of a local label in the code.  */
-    curaddr = gen_reg_rtx (Pmode);
-    label = gen_label_rtx ();
-    emit_label (label);
-    LABEL_PRESERVE_P (label) = 1;
-    emit_move_insn (curaddr, gen_rtx_LABEL_REF (Pmode, label));
-    emit_insn (gen_lshrsi3 (curaddr, curaddr, GEN_INT (30)));
-    emit_insn (gen_ashlsi3 (curaddr, curaddr, GEN_INT (30)));
+      /* Get the 2 high bits of a local label in the code.  */
+      curaddr = gen_reg_rtx (Pmode);
+      label = gen_label_rtx ();
+      emit_label (label);
+      LABEL_PRESERVE_P (label) = 1;
+      emit_move_insn (curaddr, gen_rtx_LABEL_REF (Pmode, label));
+      emit_insn (gen_lshrsi3 (curaddr, curaddr, GEN_INT (30)));
+      emit_insn (gen_ashlsi3 (curaddr, curaddr, GEN_INT (30)));
 
-    /* Clear the 2 high bits of the return address.  */
-    result = gen_reg_rtx (Pmode);
-    emit_insn (gen_ashlsi3 (result, retaddr, GEN_INT (2)));
-    emit_insn (gen_lshrsi3 (result, result, GEN_INT (2)));
+      /* Clear the 2 high bits of the return address.  */
+      result = gen_reg_rtx (Pmode);
+      emit_insn (gen_ashlsi3 (result, retaddr, GEN_INT (2)));
+      emit_insn (gen_lshrsi3 (result, result, GEN_INT (2)));
 
-    /* Combine them to get the result.  */
-    emit_insn (gen_iorsi3 (result, result, curaddr));
-    return result;
-  }
-#else
-  return retaddr;
-#endif
+      /* Combine them to get the result.  */
+      emit_insn (gen_iorsi3 (result, result, curaddr));
+      return result;
+    }
+  else
+    return retaddr;
 }
 
 /* Disable the use of word-sized or smaller complex modes for structures,
