@@ -142,7 +142,7 @@
 ;; Addition.
 
 (define_insn "addsi3"
-  [(set (match_operand:SI 0 "register_operand" "=D,D,r,r,r")
+  [(set (match_operand:SI 0 "register_operand" "=D,D,a,a,a")
 	(plus:SI (match_operand:SI 1 "register_operand" "%d,d,r,r,r")
 		 (match_operand:SI 2 "add_operand" "d,O,r,J,N")))]
   ""
