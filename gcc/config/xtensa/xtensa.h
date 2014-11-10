@@ -611,7 +611,11 @@ typedef struct xtensa_args
 
 /* Size in bytes of the trampoline, as an integer.  Make sure this is
    a multiple of TRAMPOLINE_ALIGNMENT to avoid -Wpadded warnings.  */
-#define TRAMPOLINE_SIZE (TARGET_CONST16 || TARGET_ABSOLUTE_LITERALS ? 60 : 52)
+#define TRAMPOLINE_SIZE (TARGET_WINDOWED_ABI ? \
+			 (TARGET_CONST16 || TARGET_ABSOLUTE_LITERALS ? \
+			  60 : 52) : \
+			 (TARGET_CONST16 || TARGET_ABSOLUTE_LITERALS ? \
+			  32 : 24))
 
 /* Alignment required for trampolines, in bits.  */
 #define TRAMPOLINE_ALIGNMENT 32

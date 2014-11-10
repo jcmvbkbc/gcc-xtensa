@@ -3730,9 +3730,14 @@ xtensa_function_value_regno_p (const unsigned int regno)
 static rtx
 xtensa_static_chain (const_tree ARG_UNUSED (fndecl), bool incoming_p)
 {
-  rtx base = incoming_p ? arg_pointer_rtx : stack_pointer_rtx;
-  return gen_frame_mem (Pmode, plus_constant (Pmode, base,
-					      -5 * UNITS_PER_WORD));
+  if (TARGET_WINDOWED_ABI)
+    {
+      rtx base = incoming_p ? arg_pointer_rtx : stack_pointer_rtx;
+      return gen_frame_mem (Pmode, plus_constant (Pmode, base,
+						  -5 * UNITS_PER_WORD));
+    }
+  else
+    return gen_rtx_REG (Pmode, A8_REG);
 }
 
 
@@ -3750,65 +3755,109 @@ xtensa_asm_trampoline_template (FILE *stream)
   bool use_call0 = (TARGET_CONST16 || TARGET_ABSOLUTE_LITERALS);
 
   fprintf (stream, "\t.begin no-transform\n");
-  fprintf (stream, "\tentry\tsp, %d\n", MIN_FRAME_SIZE);
 
-  if (use_call0)
+  if (TARGET_WINDOWED_ABI)
     {
-      /* Save the return address.  */
-      fprintf (stream, "\tmov\ta10, a0\n");
+      fprintf (stream, "\tentry\tsp, %d\n", MIN_FRAME_SIZE);
 
-      /* Use a CALL0 instruction to skip past the constants and in the
-	 process get the PC into A0.  This allows PC-relative access to
-	 the constants without relying on L32R.  */
-      fprintf (stream, "\tcall0\t.Lskipconsts\n");
+      if (use_call0)
+	{
+	  /* Save the return address.  */
+	  fprintf (stream, "\tmov\ta10, a0\n");
+
+	  /* Use a CALL0 instruction to skip past the constants and in the
+	     process get the PC into A0.  This allows PC-relative access to
+	     the constants without relying on L32R.  */
+	  fprintf (stream, "\tcall0\t.Lskipconsts\n");
+	}
+      else
+	fprintf (stream, "\tj\t.Lskipconsts\n");
+
+      fprintf (stream, "\t.align\t4\n");
+      fprintf (stream, ".Lchainval:%s0\n", integer_asm_op (4, TRUE));
+      fprintf (stream, ".Lfnaddr:%s0\n", integer_asm_op (4, TRUE));
+      fprintf (stream, ".Lskipconsts:\n");
+
+      /* Load the static chain and function address from the trampoline.  */
+      if (use_call0)
+	{
+	  fprintf (stream, "\taddi\ta0, a0, 3\n");
+	  fprintf (stream, "\tl32i\ta9, a0, 0\n");
+	  fprintf (stream, "\tl32i\ta8, a0, 4\n");
+	}
+      else
+	{
+	  fprintf (stream, "\tl32r\ta9, .Lchainval\n");
+	  fprintf (stream, "\tl32r\ta8, .Lfnaddr\n");
+	}
+
+      /* Store the static chain.  */
+      fprintf (stream, "\ts32i\ta9, sp, %d\n", MIN_FRAME_SIZE - 20);
+
+      /* Set the proper stack pointer value.  */
+      fprintf (stream, "\tl32i\ta9, a8, 0\n");
+      fprintf (stream, "\textui\ta9, a9, %d, 12\n",
+	       TARGET_BIG_ENDIAN ? 8 : 12);
+      fprintf (stream, "\tslli\ta9, a9, 3\n");
+      fprintf (stream, "\taddi\ta9, a9, %d\n", -MIN_FRAME_SIZE);
+      fprintf (stream, "\tsub\ta9, sp, a9\n");
+      fprintf (stream, "\tmovsp\tsp, a9\n");
+
+      if (use_call0)
+	/* Restore the return address.  */
+	fprintf (stream, "\tmov\ta0, a10\n");
+
+      /* Jump to the instruction following the ENTRY.  */
+      fprintf (stream, "\taddi\ta8, a8, 3\n");
+      fprintf (stream, "\tjx\ta8\n");
+
+      /* Pad size to a multiple of TRAMPOLINE_ALIGNMENT.  */
+      if (use_call0)
+	fprintf (stream, "\t.byte\t0\n");
+      else
+	fprintf (stream, "\tnop\n");
     }
   else
-    fprintf (stream, "\tj\t.Lskipconsts\n");
-
-  fprintf (stream, "\t.align\t4\n");
-  fprintf (stream, ".Lchainval:%s0\n", integer_asm_op (4, TRUE));
-  fprintf (stream, ".Lfnaddr:%s0\n", integer_asm_op (4, TRUE));
-  fprintf (stream, ".Lskipconsts:\n");
-
-  /* Load the static chain and function address from the trampoline.  */
-  if (use_call0)
     {
-      fprintf (stream, "\taddi\ta0, a0, 3\n");
-      fprintf (stream, "\tl32i\ta9, a0, 0\n");
-      fprintf (stream, "\tl32i\ta8, a0, 4\n");
+      if (use_call0)
+	{
+	  /* Save the return address.  */
+	  fprintf (stream, "\tmov\ta10, a0\n");
+
+	  /* Use a CALL0 instruction to skip past the constants and in the
+	     process get the PC into A0.  This allows PC-relative access to
+	     the constants without relying on L32R.  */
+	  fprintf (stream, "\tcall0\t.Lskipconsts\n");
+	}
+      else
+	fprintf (stream, "\tj\t.Lskipconsts\n");
+
+      fprintf (stream, "\t.align\t4\n");
+      fprintf (stream, ".Lchainval:%s0\n", integer_asm_op (4, TRUE));
+      fprintf (stream, ".Lfnaddr:%s0\n", integer_asm_op (4, TRUE));
+      fprintf (stream, ".Lskipconsts:\n");
+
+      /* Load the static chain and function address from the trampoline.  */
+      if (use_call0)
+	{
+	  fprintf (stream, "\taddi\ta0, a0, 3\n");
+	  fprintf (stream, "\tl32i\ta8, a0, 0\n");
+	  fprintf (stream, "\tl32i\ta9, a0, 4\n");
+	  fprintf (stream, "\tmov\ta0, a10\n");
+	}
+      else
+	{
+	  fprintf (stream, "\tl32r\ta8, .Lchainval\n");
+	  fprintf (stream, "\tl32r\ta9, .Lfnaddr\n");
+	}
+      fprintf (stream, "\tjx\ta9\n");
+
+      /* Pad size to a multiple of TRAMPOLINE_ALIGNMENT.  */
+      if (use_call0)
+	fprintf (stream, "\t.byte\t0\n");
+      else
+	fprintf (stream, "\tnop\n");
     }
-  else
-    {
-      fprintf (stream, "\tl32r\ta9, .Lchainval\n");
-      fprintf (stream, "\tl32r\ta8, .Lfnaddr\n");
-    }
-
-  /* Store the static chain.  */
-  fprintf (stream, "\ts32i\ta9, sp, %d\n", MIN_FRAME_SIZE - 20);
-
-  /* Set the proper stack pointer value.  */
-  fprintf (stream, "\tl32i\ta9, a8, 0\n");
-  fprintf (stream, "\textui\ta9, a9, %d, 12\n",
-	   TARGET_BIG_ENDIAN ? 8 : 12);
-  fprintf (stream, "\tslli\ta9, a9, 3\n");
-  fprintf (stream, "\taddi\ta9, a9, %d\n", -MIN_FRAME_SIZE);
-  fprintf (stream, "\tsub\ta9, sp, a9\n");
-  fprintf (stream, "\tmovsp\tsp, a9\n");
-
-  if (use_call0)
-    /* Restore the return address.  */
-    fprintf (stream, "\tmov\ta0, a10\n");
-
-  /* Jump to the instruction following the ENTRY.  */
-  fprintf (stream, "\taddi\ta8, a8, 3\n");
-  fprintf (stream, "\tjx\ta8\n");
-
-  /* Pad size to a multiple of TRAMPOLINE_ALIGNMENT.  */
-  if (use_call0)
-    fprintf (stream, "\t.byte\t0\n");
-  else
-    fprintf (stream, "\tnop\n");
-
   fprintf (stream, "\t.end no-transform\n");
 }
 
@@ -3817,8 +3866,19 @@ xtensa_trampoline_init (rtx m_tramp, tree fndecl, rtx chain)
 {
   rtx func = XEXP (DECL_RTL (fndecl), 0);
   bool use_call0 = (TARGET_CONST16 || TARGET_ABSOLUTE_LITERALS);
-  int chain_off = use_call0 ? 12 : 8;
-  int func_off = use_call0 ? 16 : 12;
+  int chain_off;
+  int func_off;
+
+  if (TARGET_WINDOWED_ABI)
+    {
+      chain_off = use_call0 ? 12 : 8;
+      func_off = use_call0 ? 16 : 12;
+    }
+  else
+    {
+      chain_off = use_call0 ? 8 : 4;
+      func_off = use_call0 ? 12 : 8;
+    }
 
   emit_block_move (m_tramp, assemble_trampoline_template (),
 		   GEN_INT (TRAMPOLINE_SIZE), BLOCK_OP_NORMAL);
