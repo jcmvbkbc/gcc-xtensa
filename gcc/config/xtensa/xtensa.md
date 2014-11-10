@@ -92,15 +92,6 @@
 
 (define_attr "length" "" (const_int 1))
 
-(define_attr "abi" "windowed,call0" (const_string "windowed"))
-
-(define_attr "enabled" ""
- (cond [(eq_attr "abi" "windowed") (const_int 1)
-  (and (eq_attr "abi" "call0")
-   (ne (symbol_ref "TARGET_WINDOWED_ABI") (const_int 1)))
-  (const_int 1)]
-  (const_int 0))
- )
 ;; Describe a user's asm statement.
 (define_asm_attributes
   [(set_attr "type" "multi")])
@@ -151,25 +142,19 @@
 ;; Addition.
 
 (define_insn "addsi3"
-  [(set (match_operand:SI 0 "register_operand" "=D,D,r,r,r,q,q,q,q,q")
-	(plus:SI (match_operand:SI 1 "register_operand" "%d,d,r,r,r,d,d,r,r,r")
-		 (match_operand:SI 2 "add_operand" "d,O,r,J,N,d,O,r,J,N")))]
+  [(set (match_operand:SI 0 "register_operand" "=D,D,r,r,r")
+	(plus:SI (match_operand:SI 1 "register_operand" "%d,d,r,r,r")
+		 (match_operand:SI 2 "add_operand" "d,O,r,J,N")))]
   ""
   "@
    add.n\t%0, %1, %2
    addi.n\t%0, %1, %d2
    add\t%0, %1, %2
    addi\t%0, %1, %d2
-   addmi\t%0, %1, %x2
-   add.n\t%0, %1, %2
-   addi.n\t%0, %1, %d2
-   add\t%0, %1, %2
-   addi\t%0, %1, %d2
    addmi\t%0, %1, %x2"
-  [(set_attr "type"	"arith,arith,arith,arith,arith,arith,arith,arith,arith,arith")
+  [(set_attr "type"	"arith,arith,arith,arith,arith")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"2,2,3,3,3,2,2,3,3,3")
-   (set_attr "abi"	"*,*,*,*,*,call0,call0,call0,call0,call0")])
+   (set_attr "length"	"2,2,3,3,3")])
 
 (define_insn "*addx"
   [(set (match_operand:SI 0 "register_operand" "=a")
@@ -196,15 +181,14 @@
 ;; Subtraction.
 
 (define_insn "subsi3"
-  [(set (match_operand:SI 0 "register_operand" "=a,q")
-        (minus:SI (match_operand:SI 1 "register_operand" "r,r")
-		  (match_operand:SI 2 "register_operand" "r,r")))]
+  [(set (match_operand:SI 0 "register_operand" "=a")
+        (minus:SI (match_operand:SI 1 "register_operand" "r")
+		  (match_operand:SI 2 "register_operand" "r")))]
   ""
   "sub\t%0, %1, %2"
-  [(set_attr "type"	"arith,arith")
+  [(set_attr "type"	"arith")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"3,3")
-   (set_attr "abi"	"*,call0")])
+   (set_attr "length"	"3")])
 
 (define_insn "*subx"
   [(set (match_operand:SI 0 "register_operand" "=a")
@@ -816,32 +800,28 @@
 })
 
 (define_insn "movsi_internal"
-  [(set (match_operand:SI 0 "nonimmed_operand" "=D,D,D,D,d,R,R,a,q,q,a,W,a,a,q,U,*a,*A")
-	(match_operand:SI 1 "move_operand" "M,D,d,R,R,D,d,r,r,r,I,i,T,U,U,r,*A,*r"))]
+  [(set (match_operand:SI 0 "nonimmed_operand" "=D,D,D,D,R,R,a,q,a,W,a,a,U,*a,*A")
+	(match_operand:SI 1 "move_operand" "M,D,d,R,D,d,r,r,I,i,T,U,r,*A,*r"))]
   "xtensa_valid_move (SImode, operands)"
   "@
    movi.n\t%0, %x1
    mov.n\t%0, %1
    mov.n\t%0, %1
    %v1l32i.n\t%0, %1
-   %v1l32i.n\t%0, %1
    %v0s32i.n\t%1, %0
    %v0s32i.n\t%1, %0
-   mov\t%0, %1
    mov\t%0, %1
    movsp\t%0, %1
    movi\t%0, %x1
    const16\t%0, %t1\;const16\t%0, %b1
    %v1l32r\t%0, %1
    %v1l32i\t%0, %1
-   %v1l32i\t%0, %1
    %v0s32i\t%1, %0
    rsr\t%0, ACCLO
    wsr\t%1, ACCLO"
-  [(set_attr "type" "move,move,move,load,load,store,store,move,move,move,move,move,load,load,load,store,rsr,wsr")
+  [(set_attr "type" "move,move,move,load,store,store,move,move,move,move,load,load,store,rsr,wsr")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"2,2,2,2,2,2,2,3,3,3,3,6,3,3,3,3,3,3")
-   (set_attr "abi"	"*,*,*,*,call0,*,*,*,call0,windowed,*,*,*,*,call0,*,*,*")])
+   (set_attr "length"	"2,2,2,2,2,2,3,3,3,6,3,3,3,3,3")])
 
 ;; 16-bit Integer moves
 
