@@ -1584,9 +1584,7 @@
 	(unspec_volatile:SI [(match_operand:SI 0 "const_int_operand" "i")]
 			    UNSPECV_ENTRY))]
   ""
-{
-  return TARGET_WINDOWED_ABI ? "entry\tsp, %0" : "addi\tsp, sp, -%0";
-}
+  "entry\tsp, %0"
   [(set_attr "type"	"entry")
    (set_attr "mode"	"SI")
    (set_attr "length"	"3")])
