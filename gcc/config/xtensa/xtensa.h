@@ -625,9 +625,7 @@ typedef struct xtensa_args
 
 /* Define this if the return address of a particular stack frame is
    accessed from the frame pointer of the previous stack frame.  */
-#if TARGET_WINDOWED_ABI
-#define RETURN_ADDR_IN_PREVIOUS_FRAME
-#endif
+#define RETURN_ADDR_IN_PREVIOUS_FRAME TARGET_WINDOWED_ABI
 
 /* A C expression whose value is RTL representing the value of the
    return address for the frame COUNT steps up from the current
