@@ -103,21 +103,6 @@ const char xtensa_leaf_regs[FIRST_PSEUDO_REGISTER] =
   1
 };
 
-/* Map hard register number to register class */
-const enum reg_class xtensa_regno_to_class[FIRST_PSEUDO_REGISTER] =
-{
-  RL_REGS,	SP_REG,		RL_REGS,	RL_REGS,
-  RL_REGS,	RL_REGS,	RL_REGS,	TARGET_WINDOWED_ABI ? GR_REGS : RL_REGS,
-  RL_REGS,	RL_REGS,	RL_REGS,	RL_REGS,
-  RL_REGS,	RL_REGS,	RL_REGS,	TARGET_WINDOWED_ABI ? RL_REGS : GR_REGS,
-  AR_REGS,	AR_REGS,	BR_REGS,
-  FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
-  FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
-  FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
-  FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
-  ACC_REG,
-};
-
 static void xtensa_option_override (void);
 static enum internal_test map_test_to_internal_test (enum rtx_code);
 static rtx gen_int_relational (enum rtx_code, rtx, rtx, int *);
@@ -178,8 +163,8 @@ static bool xtensa_legitimate_constant_p (enum machine_mode, rtx);
 static bool xtensa_member_type_forces_blk (const_tree,
 					   enum machine_mode mode);
 
-static const int reg_nonleaf_alloc_order[FIRST_PSEUDO_REGISTER] =
-  REG_ALLOC_ORDER;
+static void xtensa_conditional_register_usage (void);
+
 
 
 /* These hooks specify assembly directives for creating certain kinds
@@ -291,6 +276,9 @@ static const int reg_nonleaf_alloc_order[FIRST_PSEUDO_REGISTER] =
 
 #undef TARGET_LEGITIMATE_CONSTANT_P
 #define TARGET_LEGITIMATE_CONSTANT_P xtensa_legitimate_constant_p
+
+#undef TARGET_CONDITIONAL_REGISTER_USAGE
+#define TARGET_CONDITIONAL_REGISTER_USAGE xtensa_conditional_register_usage
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -3360,7 +3348,19 @@ order_regs_for_local_alloc (void)
 {
   if (!leaf_function_p ())
     {
-      memcpy (reg_alloc_order, reg_nonleaf_alloc_order,
+      static const int reg_nonleaf_alloc_order[FIRST_PSEUDO_REGISTER] =
+	REG_ALLOC_ORDER;
+      static const int reg_nonleaf_alloc_order_call0[FIRST_PSEUDO_REGISTER] =
+	{
+	  11, 10,  9,  8,  7,  6,  5,  4,  3,  2, 12, 13, 14, 15,
+	  18,
+	  19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
+	  0,  1, 16, 17,
+	  35,
+	};
+
+      memcpy (reg_alloc_order, TARGET_WINDOWED_ABI ?
+	      reg_nonleaf_alloc_order : reg_nonleaf_alloc_order_call0,
 	      FIRST_PSEUDO_REGISTER * sizeof (int));
     }
   else
@@ -3895,6 +3895,52 @@ static bool
 xtensa_legitimate_constant_p (enum machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 {
   return !xtensa_tls_referenced_p (x);
+}
+
+/* Update register usage after having seen the compiler flags.  */
+
+static void
+xtensa_conditional_register_usage (void)
+{
+  unsigned i, c_mask;
+
+  c_mask = TARGET_WINDOWED_ABI ? (1 << 1) : (1 << 2);
+
+  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+    {
+      /* Set/reset conditionally defined registers from
+	 CALL_USED_REGISTERS initializer.  */
+      if (call_used_regs[i] > 1)
+	call_used_regs[i] = !!(call_used_regs[i] & c_mask);
+    }
+
+  /* Remove hard FP register from the preferred reload registers set.  */
+  CLEAR_HARD_REG_BIT (reg_class_contents[(int)RL_REGS],
+		      HARD_FRAME_POINTER_REGNUM);
+}
+
+/* Map hard register number to register class */
+
+enum reg_class xtensa_regno_to_class (int regno)
+{
+  static const enum reg_class regno_to_class[FIRST_PSEUDO_REGISTER] =
+    {
+      RL_REGS,	SP_REG,		RL_REGS,	RL_REGS,
+      RL_REGS,	RL_REGS,	RL_REGS,	RL_REGS,
+      RL_REGS,	RL_REGS,	RL_REGS,	RL_REGS,
+      RL_REGS,	RL_REGS,	RL_REGS,	RL_REGS,
+      AR_REGS,	AR_REGS,	BR_REGS,
+      FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
+      FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
+      FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
+      FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
+      ACC_REG,
+    };
+
+  if (regno == HARD_FRAME_POINTER_REGNUM)
+    return GR_REGS;
+  else
+    return regno_to_class[regno];
 }
 
 #include "gt-xtensa.h"
