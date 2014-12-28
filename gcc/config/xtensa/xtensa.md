@@ -1526,9 +1526,8 @@
   "")
 
 (define_expand "call"
-  [(parallel [(call (match_operand 0 "memory_operand" "")
-	            (match_operand 1 "" ""))
-              (clobber (reg:SI A0_REG))])]
+  [(call (match_operand 0 "memory_operand" "")
+	 (match_operand 1 "" ""))]
   ""
 {
   rtx addr = XEXP (operands[0], 0);
@@ -1541,8 +1540,7 @@
 
 (define_insn "call_internal"
   [(call (mem (match_operand:SI 0 "call_insn_operand" "nir"))
-	 (match_operand 1 "" "i"))
-   (clobber (reg:SI A0_REG))]
+	 (match_operand 1 "" "i"))]
   ""
 {
   return xtensa_emit_call (0, operands);
@@ -1552,10 +1550,9 @@
    (set_attr "length"	"3")])
 
 (define_expand "call_value"
-  [(parallel [(set (match_operand 0 "register_operand" "")
-	           (call (match_operand 1 "memory_operand" "")
-		         (match_operand 2 "" "")))
-              (clobber (reg:SI A0_REG))])]
+  [(set (match_operand 0 "register_operand" "")
+	(call (match_operand 1 "memory_operand" "")
+	      (match_operand 2 "" "")))]
   ""
 {
   rtx addr = XEXP (operands[1], 0);
@@ -1569,8 +1566,7 @@
 (define_insn "call_value_internal"
   [(set (match_operand 0 "register_operand" "=a")
         (call (mem (match_operand:SI 1 "call_insn_operand" "nir"))
-              (match_operand 2 "" "i")))
-   (clobber (reg:SI A0_REG))]
+              (match_operand 2 "" "i")))]
   ""
 {
   return xtensa_emit_call (1, operands);

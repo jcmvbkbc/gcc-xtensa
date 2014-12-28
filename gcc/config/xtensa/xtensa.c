@@ -2591,7 +2591,7 @@ xtensa_call_save_reg(int regno)
     return false;
 
   if (regno == A0_REG)
-    return crtl->profile || df_regs_ever_live_p (regno);
+    return crtl->profile || !crtl->is_leaf || df_regs_ever_live_p (regno);
 
   return !fixed_regs[regno] && !call_used_regs[regno] &&
     df_regs_ever_live_p (regno);
