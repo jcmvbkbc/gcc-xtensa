@@ -2758,7 +2758,6 @@ xtensa_expand_epilogue (void)
   if (!TARGET_WINDOWED_ABI)
     {
       int regno;
-      rtx insn;
       HOST_WIDE_INT offset;
 
       if (xtensa_current_frame_size > (frame_pointer_needed ? 127 : 1024))
@@ -2766,7 +2765,7 @@ xtensa_expand_epilogue (void)
 	  rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
 	  emit_move_insn (tmp_reg, GEN_INT (xtensa_current_frame_size -
 					    xtensa_callee_save_size));
-	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, frame_pointer_needed ?
+	  emit_insn (gen_addsi3 (stack_pointer_rtx, frame_pointer_needed ?
 					hard_frame_pointer_rtx : stack_pointer_rtx, tmp_reg));
 	  offset = xtensa_callee_save_size - UNITS_PER_WORD;
 	}
@@ -2801,26 +2800,15 @@ xtensa_expand_epilogue (void)
 	      else
 		offset = xtensa_callee_save_size;
 
-	      insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
+	      emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
 					    GEN_INT (offset)));
 	    }
 	  else
 	    {
 	      rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
 	      emit_move_insn (tmp_reg, GEN_INT (xtensa_current_frame_size));
-	      insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
+	      emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
 	    }
-
-	  /* Create a note to describe the CFA.  Because this is only used to set
-	     DW_AT_frame_base for debug info, don't bother tracking changes through
-	     each instruction in the prologue.  It just takes up space.  */
-	  note_rtx = gen_rtx_SET (VOIDmode, stack_pointer_rtx,
-				  plus_constant (Pmode, frame_pointer_needed
-						 ? hard_frame_pointer_rtx
-						 : stack_pointer_rtx,
-						 xtensa_current_frame_size));
-	  RTX_FRAME_RELATED_P (insn) = 1;
-	  add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
 	}
     }
   xtensa_current_frame_size = 0;
