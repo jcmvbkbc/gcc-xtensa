@@ -2831,7 +2831,15 @@ xtensa_expand_epilogue (void)
 rtx
 xtensa_return_addr (int count, rtx frame)
 {
-  rtx retaddr;
+  rtx result, retaddr, curaddr, label;
+
+  if (!TARGET_WINDOWED_ABI)
+    {
+      if (count != 0)
+	return const0_rtx;
+
+      return get_hard_reg_initial_val (Pmode, A0_REG);
+    }
 
   if (count == -1)
     retaddr = gen_rtx_REG (Pmode, A0_REG);
@@ -2843,34 +2851,28 @@ xtensa_return_addr (int count, rtx frame)
       emit_move_insn (retaddr, gen_rtx_MEM (Pmode, addr));
     }
 
-  if (TARGET_WINDOWED_ABI)
-    {
-      rtx result, curaddr, label;
-      /* The 2 most-significant bits of the return address on Xtensa hold
-	 the register window size.  To get the real return address, these
-	 bits must be replaced with the high bits from some address in the
-	 code.  */
+  /* The 2 most-significant bits of the return address on Xtensa hold
+     the register window size.  To get the real return address, these
+     bits must be replaced with the high bits from some address in the
+     code.  */
 
-      /* Get the 2 high bits of a local label in the code.  */
-      curaddr = gen_reg_rtx (Pmode);
-      label = gen_label_rtx ();
-      emit_label (label);
-      LABEL_PRESERVE_P (label) = 1;
-      emit_move_insn (curaddr, gen_rtx_LABEL_REF (Pmode, label));
-      emit_insn (gen_lshrsi3 (curaddr, curaddr, GEN_INT (30)));
-      emit_insn (gen_ashlsi3 (curaddr, curaddr, GEN_INT (30)));
+  /* Get the 2 high bits of a local label in the code.  */
+  curaddr = gen_reg_rtx (Pmode);
+  label = gen_label_rtx ();
+  emit_label (label);
+  LABEL_PRESERVE_P (label) = 1;
+  emit_move_insn (curaddr, gen_rtx_LABEL_REF (Pmode, label));
+  emit_insn (gen_lshrsi3 (curaddr, curaddr, GEN_INT (30)));
+  emit_insn (gen_ashlsi3 (curaddr, curaddr, GEN_INT (30)));
 
-      /* Clear the 2 high bits of the return address.  */
-      result = gen_reg_rtx (Pmode);
-      emit_insn (gen_ashlsi3 (result, retaddr, GEN_INT (2)));
-      emit_insn (gen_lshrsi3 (result, result, GEN_INT (2)));
+  /* Clear the 2 high bits of the return address.  */
+  result = gen_reg_rtx (Pmode);
+  emit_insn (gen_ashlsi3 (result, retaddr, GEN_INT (2)));
+  emit_insn (gen_lshrsi3 (result, result, GEN_INT (2)));
 
-      /* Combine them to get the result.  */
-      emit_insn (gen_iorsi3 (result, result, curaddr));
-      return result;
-    }
-  else
-    return retaddr;
+  /* Combine them to get the result.  */
+  emit_insn (gen_iorsi3 (result, result, curaddr));
+  return result;
 }
 
 /* Disable the use of word-sized or smaller complex modes for structures,
