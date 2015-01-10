@@ -2667,6 +2667,11 @@ xtensa_expand_prologue (void)
 	{
 	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
 					GEN_INT (-total_size)));
+	  RTX_FRAME_RELATED_P (insn) = 1;
+	  note_rtx = gen_rtx_SET (VOIDmode, stack_pointer_rtx,
+				  plus_constant (Pmode, stack_pointer_rtx,
+						 -total_size));
+	  add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
 	  offset = total_size - UNITS_PER_WORD;
 	}
       else if (xtensa_callee_save_size)
@@ -2678,6 +2683,11 @@ xtensa_expand_prologue (void)
 	    {
 	      insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
 					    GEN_INT (-xtensa_callee_save_size)));
+	      RTX_FRAME_RELATED_P (insn) = 1;
+	      note_rtx = gen_rtx_SET (VOIDmode, stack_pointer_rtx,
+				      plus_constant (Pmode, stack_pointer_rtx,
+						     -xtensa_callee_save_size));
+	      add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
 	      offset = xtensa_callee_save_size - UNITS_PER_WORD;
 	    }
 	  else
@@ -2685,6 +2695,11 @@ xtensa_expand_prologue (void)
 	      rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
 	      emit_move_insn (tmp_reg, GEN_INT (total_size));
 	      insn = emit_insn (gen_subsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
+	      RTX_FRAME_RELATED_P (insn) = 1;
+	      note_rtx = gen_rtx_SET (VOIDmode, stack_pointer_rtx,
+				      plus_constant (Pmode, stack_pointer_rtx,
+						     -total_size));
+	      add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
 	      offset = total_size - UNITS_PER_WORD;
 	    }
 	}
@@ -2694,9 +2709,14 @@ xtensa_expand_prologue (void)
 	  if (xtensa_call_save_reg(regno))
 	    {
 	      rtx x = gen_rtx_PLUS (Pmode, stack_pointer_rtx, GEN_INT (offset));
+	      rtx mem = gen_frame_mem (SImode, x);
+	      rtx reg = gen_rtx_REG (SImode, regno);
 
 	      offset -= UNITS_PER_WORD;
-	      emit_move_insn (gen_frame_mem (SImode, x), gen_rtx_REG (SImode, regno));
+	      insn = emit_move_insn (mem, reg);
+	      RTX_FRAME_RELATED_P (insn) = 1;
+	      add_reg_note (insn, REG_FRAME_RELATED_EXPR,
+			    gen_rtx_SET (VOIDmode, mem, reg));
 	    }
 	}
       if (total_size > 1024)
@@ -2704,6 +2724,11 @@ xtensa_expand_prologue (void)
 	  rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
 	  emit_move_insn (tmp_reg, GEN_INT (total_size - xtensa_callee_save_size));
 	  insn = emit_insn (gen_subsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
+	  RTX_FRAME_RELATED_P (insn) = 1;
+	  note_rtx = gen_rtx_SET (VOIDmode, stack_pointer_rtx,
+				  plus_constant (Pmode, stack_pointer_rtx,
+						 xtensa_callee_save_size - total_size));
+	  add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
 	}
     }
 
@@ -2733,11 +2758,20 @@ xtensa_expand_prologue (void)
 	    }
 	}
       else
-	insn = emit_insn (gen_movsi (hard_frame_pointer_rtx,
-				     stack_pointer_rtx));
+        {
+	  insn = emit_insn (gen_movsi (hard_frame_pointer_rtx,
+				       stack_pointer_rtx));
+	  if (!TARGET_WINDOWED_ABI)
+	    {
+	      note_rtx = gen_rtx_SET (VOIDmode, hard_frame_pointer_rtx,
+				      stack_pointer_rtx);
+	      RTX_FRAME_RELATED_P (insn) = 1;
+	      add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
+	    }
+	}
     }
 
-  if (TARGET_WINDOWED_ABI || total_size > 0)
+  if (TARGET_WINDOWED_ABI)
     {
       /* Create a note to describe the CFA.  Because this is only used to set
 	 DW_AT_frame_base for debug info, don't bother tracking changes through
