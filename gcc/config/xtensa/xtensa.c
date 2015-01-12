@@ -2579,7 +2579,11 @@ xtensa_call_save_reg(int regno)
     return false;
 
   if (regno == A0_REG)
-    return crtl->profile || !crtl->is_leaf || df_regs_ever_live_p (regno);
+    return crtl->profile || !crtl->is_leaf || crtl->calls_eh_return ||
+      df_regs_ever_live_p (regno);
+
+  if (crtl->calls_eh_return && regno >= 2 && regno < 4)
+    return true;
 
   return !fixed_regs[regno] && !call_used_regs[regno] &&
     df_regs_ever_live_p (regno);
@@ -2810,6 +2814,11 @@ xtensa_expand_epilogue (void)
 	  offset = xtensa_current_frame_size - UNITS_PER_WORD;
 	}
 
+      /* Prevent reordering of saved a0 update and loading it back from
+	 the save area.  */
+      if (crtl->calls_eh_return)
+	emit_insn (gen_blockage ());
+
       for (regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
 	{
 	  if (xtensa_call_save_reg(regno))
@@ -2844,10 +2853,39 @@ xtensa_expand_epilogue (void)
 	      emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp_reg));
 	    }
 	}
+
+      if (crtl->calls_eh_return)
+	emit_insn (gen_add3_insn (stack_pointer_rtx,
+				  stack_pointer_rtx,
+				  EH_RETURN_STACKADJ_RTX));
     }
   xtensa_current_frame_size = 0;
   xtensa_callee_save_size = 0;
   emit_jump_insn (gen_return ());
+}
+
+void
+xtensa_set_return_address (rtx address, rtx scratch)
+{
+  HOST_WIDE_INT total_size = compute_frame_size (get_frame_size ());
+  rtx frame = frame_pointer_needed ?
+    hard_frame_pointer_rtx : stack_pointer_rtx;
+  rtx a0_addr = plus_constant (Pmode, frame,
+			       total_size - UNITS_PER_WORD);
+  rtx note = gen_rtx_SET (VOIDmode,
+			  gen_frame_mem (SImode, a0_addr),
+			  gen_rtx_REG (SImode, A0_REG));
+  rtx insn;
+
+  if (total_size > 1024) {
+    emit_move_insn (scratch, GEN_INT (total_size - UNITS_PER_WORD));
+    emit_insn (gen_addsi3 (scratch, frame, scratch));
+    a0_addr = scratch;
+  }
+
+  insn = emit_move_insn (gen_frame_mem (SImode, a0_addr), address);
+  RTX_FRAME_RELATED_P (insn) = 1;
+  add_reg_note (insn, REG_FRAME_RELATED_EXPR, note);
 }
 
 rtx

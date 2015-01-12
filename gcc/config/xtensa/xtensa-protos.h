@@ -61,6 +61,7 @@ extern void init_cumulative_args (CUMULATIVE_ARGS *, int);
 extern void print_operand (FILE *, rtx, int);
 extern void print_operand_address (FILE *, rtx);
 extern void xtensa_output_literal (FILE *, rtx, enum machine_mode, int);
+extern void xtensa_set_return_address (rtx, rtx);
 extern rtx xtensa_return_addr (int, rtx);
 #endif /* RTX_CODE */
 

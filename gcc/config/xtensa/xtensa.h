@@ -815,6 +815,8 @@ typedef struct xtensa_args
       | DW_EH_PE_pcrel | DW_EH_PE_sdata4)				\
    : DW_EH_PE_absptr)
 
+#define EH_RETURN_STACKADJ_RTX gen_rtx_REG (Pmode, GP_REG_FIRST + 10)
+
 /* Emit a PC-relative relocation.  */
 #define ASM_OUTPUT_DWARF_PCREL(FILE, SIZE, LABEL)			\
   do {									\
