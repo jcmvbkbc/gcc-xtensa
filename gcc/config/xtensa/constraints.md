@@ -142,3 +142,19 @@
       (and (match_code "reg")
 	   (match_test "reload_in_progress
 			&& REGNO (op) >= FIRST_PSEUDO_REGISTER"))))
+
+(define_constraint "u"
+ "Memory that is not in a literal pool, but only in the absence of -mforce-l32,
+  or pseudoregister."
+ (ior (and (and (match_code "mem")
+		(match_test "! constantpool_mem_p (op)"))
+           (match_test "!TARGET_FORCE_L32"))
+      (and (match_code "reg")
+	   (match_test "reload_in_progress
+			&& REGNO (op) >= FIRST_PSEUDO_REGISTER"))))
+
+(define_constraint "Z"
+ "Memory that is not in a literal pool, but only in the presence of -mforce-l32."
+ (and (and (match_code "mem")
+	   (match_test "! constantpool_mem_p (op)"))
+      (match_test "TARGET_FORCE_L32")))
