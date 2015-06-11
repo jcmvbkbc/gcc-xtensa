@@ -194,6 +194,7 @@ static void xtensa_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
 static bool xtensa_lra_p (void);
 
 static rtx xtensa_delegitimize_address (rtx);
+static void output_address_base (FILE *file, rtx addr);
 
 
 
@@ -2518,7 +2519,8 @@ xtensa_legitimate_address_p (machine_mode mode, rtx addr, bool strict)
     return true;
 
   /* Check for "register + offset" addressing.  */
-  if (GET_CODE (addr) == PLUS)
+  if (GET_CODE (addr) == PLUS &&
+      (!TARGET_FORCE_L32 || (mode != HImode && mode != QImode)))
     {
       rtx xplus0 = XEXP (addr, 0);
       rtx xplus1 = XEXP (addr, 1);
@@ -3205,7 +3207,6 @@ printx (FILE *file, signed int val)
     fprintf (file, "0x%x", val);
 }
 
-
 void
 print_operand (FILE *file, rtx x, int letter)
 {
@@ -3214,6 +3215,13 @@ print_operand (FILE *file, rtx x, int letter)
 
   switch (letter)
     {
+    case 'B':
+      if (GET_CODE (x) == MEM)
+	output_address_base (file, XEXP (x, 0));
+      else
+	output_operand_lossage ("invalid %%B value");
+      break;
+
     case 'D':
       if (GET_CODE (x) == REG || GET_CODE (x) == SUBREG)
 	fprintf (file, "%s", reg_names[xt_true_regnum (x) + 1]);
@@ -3352,6 +3360,47 @@ print_operand (FILE *file, rtx x, int letter)
     }
 }
 
+static void
+output_address_base (FILE *file, rtx addr)
+{
+  switch (GET_CODE (addr))
+    {
+    default:
+      fatal_insn ("invalid address", addr);
+      break;
+
+    case REG:
+      fprintf (file, "%s", reg_names [REGNO (addr)]);
+      break;
+
+    case PLUS:
+      {
+	rtx reg = (rtx)0;
+	rtx offset = (rtx)0;
+	rtx arg0 = XEXP (addr, 0);
+	rtx arg1 = XEXP (addr, 1);
+
+	if (GET_CODE (arg0) == REG)
+	  {
+	    reg = arg0;
+	    offset = arg1;
+	  }
+	else if (GET_CODE (arg1) == REG)
+	  {
+	    reg = arg1;
+	    offset = arg0;
+	  }
+	else
+	  fatal_insn ("no register in address", addr);
+
+	if (CONSTANT_P (offset))
+	  fprintf (file, "%s", reg_names [REGNO (reg)]);
+	else
+	  fatal_insn ("address offset not a constant", addr);
+      }
+      break;
+    }
+}
 
 /* A C compound statement to output to stdio stream STREAM the
    assembler syntax for an instruction operand that is a memory

@@ -861,26 +861,30 @@
 ;; Zero-extend instructions.
 
 (define_insn "zero_extendhisi2"
-  [(set (match_operand:SI 0 "register_operand" "=a,a")
-	(zero_extend:SI (match_operand:HI 1 "nonimmed_operand" "r,U")))]
+  [(set (match_operand:SI 0 "register_operand" "=a,a,a,a")
+	(zero_extend:SI (match_operand:HI 1 "nonimmed_operand" "r,ZY,Zz,ZZ")))]
   ""
   "@
    extui\t%0, %1, 0, 16
-   %v1l16ui\t%0, %1"
-  [(set_attr "type"	"arith,load")
+   %v1l16ui\t%0, %1
+   ssa8l\t%B1 ; srli\t%0, %B1, 2 ; slli\t%0, %0, 2 ; %v1l32i\t%0, %0, 0 ; srl\t%0, %0 ; extui\t%0, %0, 0, 16
+   ssa8b\t%B1 ; srli\t%0, %B1, 2 ; slli\t%0, %0, 2 ; %v1l32i\t%0, %0, 0 ; sll\t%0, %0 ; extui\t%0, %0, 16, 16"
+  [(set_attr "type"	"arith,load,load,load")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"3,3")])
+   (set_attr "length"	"3,3,18,18")])
 
 (define_insn "zero_extendqisi2"
-  [(set (match_operand:SI 0 "register_operand" "=a,a")
-	(zero_extend:SI (match_operand:QI 1 "nonimmed_operand" "r,U")))]
+  [(set (match_operand:SI 0 "register_operand" "=a,a,a,a")
+	(zero_extend:SI (match_operand:QI 1 "nonimmed_operand" "r,ZY,Zz,ZZ")))]
   ""
   "@
    extui\t%0, %1, 0, 8
-   %v1l8ui\t%0, %1"
-  [(set_attr "type"	"arith,load")
+   %v1l8ui\t%0, %1
+   ssa8l\t%B1 ; srli\t%0, %B1, 2 ; slli\t%0, %0, 2 ; %v1l32i\t%0, %0, 0 ; srl\t%0, %0 ; extui\t%0, %0, 0, 8
+   ssa8b\t%B1 ; srli\t%0, %B1, 2 ; slli\t%0, %0, 2 ; %v1l32i\t%0, %0, 0 ; sll\t%0, %0 ; extui\t%0, %0, 24, 8"
+  [(set_attr "type"	"arith,load,load,load")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"3,3")])
+   (set_attr "length"	"3,3,18,18")])
 
 
 ;; Sign-extend instructions.
@@ -898,15 +902,16 @@
 })
 
 (define_insn "extendhisi2_internal"
-  [(set (match_operand:SI 0 "register_operand" "=B,a")
-	(sign_extend:SI (match_operand:HI 1 "sext_operand" "r,U")))]
+  [(set (match_operand:SI 0 "register_operand" "=B,a,a")
+	(sign_extend:SI (match_operand:HI 1 "sext_operand" "r,r,ZY")))]
   ""
   "@
    sext\t%0, %1, 15
+   slli\t%0, %1, 16 ; srai\t%0, %0, 16
    %v1l16si\t%0, %1"
-  [(set_attr "type"	"arith,load")
+  [(set_attr "type"	"arith,arith,load")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"3,3")])
+   (set_attr "length"	"3,6,3")])
 
 (define_expand "extendqisi2"
   [(set (match_operand:SI 0 "register_operand" "")
@@ -1179,8 +1184,8 @@
 })
 
 (define_insn "movhi_internal"
-  [(set (match_operand:HI 0 "nonimmed_operand" "=D,D,a,a,a,a,U,*a,*A")
-	(match_operand:HI 1 "move_operand" "M,d,r,I,Y,U,r,*A,*r"))]
+  [(set (match_operand:HI 0 "nonimmed_operand" "=D,D,a,a,a,a,a,a,U,*a,*A")
+	(match_operand:HI 1 "move_operand" "M,d,r,I,Y,ZY,Zz,ZZ,r,*A,*r"))]
   "xtensa_valid_move (HImode, operands)"
   "@
    movi.n\t%0, %x1
@@ -1189,12 +1194,14 @@
    movi\t%0, %x1
    movi\t%0, %1
    %v1l16ui\t%0, %1
+   ssa8l\t%B1 ; srli\t%0, %B1, 2 ; slli\t%0, %0, 2 ; %v1l32i\t%0, %0, 0 ; srl\t%0, %0 ; extui\t%0, %0, 0, 16
+   ssa8b\t%B1 ; srli\t%0, %B1, 2 ; slli\t%0, %0, 2 ; %v1l32i\t%0, %0, 0 ; sll\t%0, %0 ; extui\t%0, %0, 16, 16
    %v0s16i\t%1, %0
    rsr\t%0, ACCLO
    wsr\t%1, ACCLO"
-  [(set_attr "type"	"move,move,move,move,move,load,store,rsr,wsr")
+  [(set_attr "type"	"move,move,move,move,move,load,load,load,store,rsr,wsr")
    (set_attr "mode"	"HI")
-   (set_attr "length"	"2,2,3,3,3,3,3,3,3")])
+   (set_attr "length"	"2,2,3,3,3,3,18,18,3,3,3")])
 
 ;; 8-bit Integer moves
 
@@ -1208,8 +1215,8 @@
 })
 
 (define_insn "movqi_internal"
-  [(set (match_operand:QI 0 "nonimmed_operand" "=D,D,a,a,a,U,*a,*A")
-	(match_operand:QI 1 "move_operand" "M,d,r,I,U,r,*A,*r"))]
+  [(set (match_operand:QI 0 "nonimmed_operand" "=D,D,a,a,a,a,a,U,*a,*A")
+	(match_operand:QI 1 "move_operand" "M,d,r,I,ZY,Zz,ZZ,r,*A,*r"))]
   "xtensa_valid_move (QImode, operands)"
   "@
    movi.n\t%0, %x1
@@ -1217,12 +1224,14 @@
    mov\t%0, %1
    movi\t%0, %x1
    %v1l8ui\t%0, %1
+   ssa8l\t%B1 ; srli\t%0, %B1, 2 ; slli\t%0, %0, 2 ; %v1l32i\t%0, %0, 0 ; srl\t%0, %0 ; extui\t%0, %0, 0, 8
+   ssa8b\t%B1 ; srli\t%0, %B1, 2 ; slli\t%0, %0, 2 ; %v1l32i\t%0, %0, 0 ; sll\t%0, %0 ; extui\t%0, %0, 24, 8
    %v0s8i\t%1, %0
    rsr\t%0, ACCLO
    wsr\t%1, ACCLO"
-  [(set_attr "type"	"move,move,move,move,load,store,rsr,wsr")
+  [(set_attr "type"	"move,move,move,move,load,load,store,load,rsr,wsr")
    (set_attr "mode"	"QI")
-   (set_attr "length"	"2,2,3,3,3,3,3,3")])
+   (set_attr "length"  "2,2,3,3,3,18,18,3,3,3")])
 
 ;; Sub-word reloads from the constant pool.
 

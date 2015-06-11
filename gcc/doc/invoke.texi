@@ -1475,7 +1475,8 @@ See RS/6000 and PowerPC Options.
 -mlongcalls  -mno-longcalls
 -mabi=@var{abi-type}
 -mextra-l32r-costs=@var{cycles}
--mstrict-align  -mno-strict-align}
+-mstrict-align  -mno-strict-align
+-mforce-l32  -mno-force-l32}
 
 @emph{zSeries Options}
 See S/390 and zSeries Options.
@@ -34413,6 +34414,16 @@ The default is @option{-mno-strict-align} for cores that support both
 unaligned loads and stores in hardware and @option{-mstrict-align} for all
 other cores.
 
+@item -mforce-l32
+@itemx -mno-force-l32
+@opindex mforce-l32
+@opindex mno-force-l32
+When this option is enabled, GCC generates instruction sequence that
+uses the @code{L32I} instruction to load 8- and 16-bit values from memory.
+This may be useful to compile code for systems that store constant data
+in memory that is only word-accessible.  Examples of such systems are
+the ESP8266 and ESP32 SoCs where FLASH memory mapped for code execution
+is only word-readable.
 @end table
 
 @node zSeries Options

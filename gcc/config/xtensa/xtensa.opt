@@ -57,6 +57,10 @@ mserialize-volatile
 Target Mask(SERIALIZE_VOLATILE)
 -mno-serialize-volatile	Do not serialize volatile memory references with MEMW instructions.
 
+mforce-l32
+Target Mask(FORCE_L32)
+Use l32i to access 1- and 2-byte quantities in memory instead of l8ui/l16ui.
+
 TargetVariable
 int xtensa_windowed_abi = -1
 

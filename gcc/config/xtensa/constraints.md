@@ -149,3 +149,31 @@
       (and (match_code "reg")
 	   (match_test "reload_in_progress
 			&& REGNO (op) >= FIRST_PSEUDO_REGISTER"))))
+
+(define_constraint "ZY"
+ "Memory that is not in a literal pool
+  when the -mforce-l32 option is not specified."
+ (ior (and (and (match_code "mem")
+		(match_test "! constantpool_mem_p (op)"))
+           (match_test "!TARGET_FORCE_L32"))
+      (and (match_code "reg")
+	   (match_test "reload_in_progress
+			&& REGNO (op) >= FIRST_PSEUDO_REGISTER"))))
+
+(define_constraint "Zz"
+ "Memory that is not in a literal pool
+  when the -mforce-l32 option is specified
+  and the target is little-endian."
+ (and (and (match_code "mem")
+	   (match_test "! constantpool_mem_p (op)"))
+      (and (match_test "TARGET_FORCE_L32")
+	   (match_test "!TARGET_BIG_ENDIAN"))))
+
+(define_constraint "ZZ"
+ "Memory that is not in a literal pool
+  when the -mforce-l32 option is specified
+  and the target is big-endian."
+ (and (and (match_code "mem")
+	   (match_test "! constantpool_mem_p (op)"))
+      (and (match_test "TARGET_FORCE_L32")
+	   (match_test "TARGET_BIG_ENDIAN"))))
