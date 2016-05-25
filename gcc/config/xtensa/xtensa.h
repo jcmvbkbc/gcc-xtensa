@@ -504,9 +504,19 @@ enum reg_class
    location above the first argument's address.  */
 #define FIRST_PARM_OFFSET(FNDECL) 0
 
-/* Align stack frames on 128 bits for Xtensa.  This is necessary for
-   128-bit datatypes defined in TIE (e.g., for Vectra).  */
-#define STACK_BOUNDARY 128
+/* Align stack frames on 32 bits for call0 ABI or on 64 bits for windowed
+   ABI on Xtensa.  These are the absolute minimums dictated by the hardware
+   (windowed is 64 bits because the entry instruction moves SP in multiples
+   of 8 bytes).  ABIs require alignment to be 128 bits to support datatypes
+   defined in TIE (e.g., for Vectra).  */
+#define STACK_BOUNDARY (TARGET_WINDOWED_ABI ? 64 : 32)
+
+/* Align stack frames on 128 bits in accordance with ABI.  This alignment
+   may be reduced when stack space conservation is preferred over ABI
+   compliance with -mpreferred-stack-boundary option.  */
+#define PREFERRED_STACK_BOUNDARY					\
+	MAX (STACK_BOUNDARY,						\
+	     (BITS_PER_UNIT << xtensa_preferred_stack_boundary))
 
 /* Use a fixed register window size of 8.  */
 #define WINDOW_SIZE (TARGET_WINDOWED_ABI ? 8 : 0)

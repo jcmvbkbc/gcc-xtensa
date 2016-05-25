@@ -2113,7 +2113,8 @@ xtensa_function_arg_1 (cumulative_args_t cum_v, machine_mode mode,
 
   if (type && (TYPE_ALIGN (type) > BITS_PER_WORD))
     {
-      int align = MIN (TYPE_ALIGN (type), STACK_BOUNDARY) / BITS_PER_WORD;
+      int align = MIN (TYPE_ALIGN (type),
+		       PREFERRED_STACK_BOUNDARY) / BITS_PER_WORD;
       *arg_words = (*arg_words + align - 1) & -align;
     }
 
@@ -2154,8 +2155,8 @@ xtensa_function_arg_boundary (machine_mode mode, const_tree type)
   alignment = type ? TYPE_ALIGN (type) : GET_MODE_ALIGNMENT (mode);
   if (alignment < PARM_BOUNDARY)
     alignment = PARM_BOUNDARY;
-  if (alignment > STACK_BOUNDARY)
-    alignment = STACK_BOUNDARY;
+  if (alignment > PREFERRED_STACK_BOUNDARY)
+    alignment = PREFERRED_STACK_BOUNDARY;
   return alignment;
 }
 
@@ -2620,7 +2621,7 @@ xtensa_call_save_reg(int regno)
 /* Return the bytes needed to compute the frame pointer from the current
    stack pointer.  */
 
-#define STACK_BYTES (STACK_BOUNDARY / BITS_PER_UNIT)
+#define STACK_BYTES (PREFERRED_STACK_BOUNDARY / BITS_PER_UNIT)
 #define XTENSA_STACK_ALIGN(LOC) (((LOC) + STACK_BYTES-1) & ~(STACK_BYTES-1))
 
 long
@@ -3177,7 +3178,8 @@ xtensa_gimplify_va_arg_expr (tree valist, tree type, gimple_seq *pre_p,
 
   if (TYPE_ALIGN (type) > BITS_PER_WORD)
     {
-      int align = MIN (TYPE_ALIGN (type), STACK_BOUNDARY) / BITS_PER_UNIT;
+      int align = MIN (TYPE_ALIGN (type),
+		       PREFERRED_STACK_BOUNDARY) / BITS_PER_UNIT;
 
       t = build2 (PLUS_EXPR, integer_type_node, unshare_expr (orig_ndx),
 		  build_int_cst (integer_type_node, align - 1));

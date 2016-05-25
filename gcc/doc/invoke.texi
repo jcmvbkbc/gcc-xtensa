@@ -1190,6 +1190,7 @@ See RS/6000 and PowerPC Options.
 -mtext-section-literals  -mno-text-section-literals @gol
 -mauto-litpools  -mno-auto-litpools @gol
 -mtarget-align  -mno-target-align @gol
+-mpreferred-stack-boundary=@var{num} @gol
 -mlongcalls  -mno-longcalls}
 
 @emph{zSeries Options}
@@ -24541,6 +24542,21 @@ default is @option{-mtarget-align}.  These options do not affect the
 treatment of auto-aligned instructions like @code{LOOP}, which the
 assembler always aligns, either by widening density instructions or
 by inserting NOP instructions.
+
+@item -mpreferred-stack-boundary=@var{num}
+@opindex mpreferred-stack-boundary
+Attempt to keep the stack boundary aligned to a 2 raised to @var{num}
+byte boundary.  If @option{-mpreferred-stack-boundary} is not specified,
+the default is 4 (16 bytes or 128 bits).
+
+@strong{Warning:} When generating code for the Xtensa architecture that
+does not use TIE types, @option{-mpreferred-stack-boundary=3} can be
+used to keep the stack boundary aligned to 8 byte boundary in windowed
+ABI, and @option{-mpreferred-stack-boundary=2} can be used to keep the
+stack boundary aligned to 4 byte boundary in call0 ABI.  Since both
+windowed and call0 ABI require 16 byte stack alignment, this is ABI
+incompatible and intended to be used in controlled environment where
+stack space is important limitation.
 
 @item -mlongcalls
 @itemx -mno-longcalls
