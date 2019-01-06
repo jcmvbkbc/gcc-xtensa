@@ -186,6 +186,16 @@ static bool xtensa_modes_tieable_p (machine_mode, machine_mode);
 static HOST_WIDE_INT xtensa_constant_alignment (const_tree, HOST_WIDE_INT);
 static HOST_WIDE_INT xtensa_starting_frame_offset (void);
 static unsigned HOST_WIDE_INT xtensa_asan_shadow_offset (void);
+static bool xtensa_function_ok_for_sibcall (tree decl ATTRIBUTE_UNUSED,
+					    tree exp ATTRIBUTE_UNUSED);
+static bool xtensa_can_output_mi_thunk (const_tree thunk_fndecl ATTRIBUTE_UNUSED,
+					HOST_WIDE_INT delta ATTRIBUTE_UNUSED,
+					HOST_WIDE_INT vcall_offset ATTRIBUTE_UNUSED,
+					const_tree function ATTRIBUTE_UNUSED);
+static void xtensa_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
+				    HOST_WIDE_INT delta,
+				    HOST_WIDE_INT vcall_offset,
+				    tree function);
 
 
 
@@ -333,6 +343,15 @@ static unsigned HOST_WIDE_INT xtensa_asan_shadow_offset (void);
 
 #undef TARGET_HAVE_SPECULATION_SAFE_VALUE
 #define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed
+
+#undef TARGET_FUNCTION_OK_FOR_SIBCALL
+#define TARGET_FUNCTION_OK_FOR_SIBCALL xtensa_function_ok_for_sibcall
+
+#undef TARGET_ASM_CAN_OUTPUT_MI_THUNK
+#define TARGET_ASM_CAN_OUTPUT_MI_THUNK xtensa_can_output_mi_thunk
+
+#undef TARGET_ASM_OUTPUT_MI_THUNK
+#define TARGET_ASM_OUTPUT_MI_THUNK xtensa_output_mi_thunk
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -1819,6 +1838,32 @@ xtensa_emit_call (int callop, rtx *operands)
     sprintf (result, "call%d\t%%%d", WINDOW_SIZE, callop);
 
   return result;
+}
+
+void
+xtensa_emit_sibcall (int callop, rtx *operands)
+{
+  rtx tgt = operands[callop];
+
+  if (register_operand (tgt, VOIDmode))
+    output_asm_insn ("mov\ta9, %0", operands);
+  else
+    output_asm_insn ("movi\ta9, %0", operands);
+
+  if (TARGET_WINDOWED_ABI)
+    {
+      output_asm_insn ("l32i\ta10, a9, 0", operands);
+      if (TARGET_BIG_ENDIAN)
+	output_asm_insn ("extui\ta11, a10, 8, 12", operands);
+      else
+	output_asm_insn ("extui\ta11, a10, 12, 12", operands);
+      output_asm_insn ("slli\ta11, a11, 3", operands);
+      output_asm_insn ("addi\ta11, a11, -32", operands);
+      output_asm_insn ("sub\ta11, sp, a11", operands);
+      output_asm_insn ("movsp\tsp, a11", operands);
+      output_asm_insn ("addi\ta9, a9, 3", operands);
+    }
+  output_asm_insn ("jx\ta9", operands);
 }
 
 
@@ -4425,6 +4470,105 @@ static unsigned HOST_WIDE_INT
 xtensa_asan_shadow_offset (void)
 {
   return HOST_WIDE_INT_UC (0x10000000);
+}
+
+static bool
+xtensa_function_ok_for_sibcall (tree decl ATTRIBUTE_UNUSED,
+				tree exp ATTRIBUTE_UNUSED)
+{
+  return false;
+}
+
+static bool
+xtensa_can_output_mi_thunk (const_tree thunk_fndecl ATTRIBUTE_UNUSED,
+			    HOST_WIDE_INT delta ATTRIBUTE_UNUSED,
+			    HOST_WIDE_INT vcall_offset ATTRIBUTE_UNUSED,
+			    const_tree function ATTRIBUTE_UNUSED)
+{
+  return true;
+}
+
+/* Output code to add DELTA to the first argument, and then jump
+   to FUNCTION.  Used for C++ multiple inheritance.  */
+static void
+xtensa_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
+			HOST_WIDE_INT delta,
+			HOST_WIDE_INT vcall_offset,
+			tree function)
+{
+  rtx this_rtx;
+  rtx funexp;
+  rtx_insn *insn;
+  int this_reg_no;
+  rtx temp0 = gen_rtx_REG (Pmode, A0_REG + 9);
+  const char *fnname = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (thunk));
+
+  reload_completed = 1;
+  if (TARGET_WINDOWED_ABI)
+    {
+      emit_insn (gen_entry (GEN_INT (MIN_FRAME_SIZE)));
+      emit_note (NOTE_INSN_PROLOGUE_END);
+    }
+
+  if (aggregate_value_p (TREE_TYPE (TREE_TYPE (function)), function))
+    this_reg_no = 3;
+  else
+    this_reg_no = 2;
+
+  this_rtx = gen_rtx_REG (Pmode, A0_REG + this_reg_no);
+
+  if (delta)
+    {
+      if (xtensa_simm8 (delta))
+	emit_insn (gen_addsi3 (this_rtx, this_rtx, GEN_INT (delta)));
+      else
+	{
+	  emit_move_insn (temp0, GEN_INT (delta));
+	  emit_insn (gen_addsi3 (this_rtx, this_rtx, temp0));
+	}
+    }
+
+  if (vcall_offset)
+    {
+      rtx temp1 = gen_rtx_REG (Pmode, A0_REG + 10);
+      rtx addr = temp1;
+
+      emit_move_insn (temp0, gen_rtx_MEM (Pmode, this_rtx));
+      if (xtensa_uimm8x4 (vcall_offset))
+	addr = plus_constant (Pmode, temp0, vcall_offset);
+      else if (xtensa_simm8 (vcall_offset))
+	emit_insn (gen_addsi3 (temp1, temp0, GEN_INT (vcall_offset)));
+      else
+	{
+	  emit_move_insn (temp1, GEN_INT (vcall_offset));
+	  emit_insn (gen_addsi3 (temp1, temp0, temp1));
+	}
+      emit_move_insn (temp1, gen_rtx_MEM (Pmode, addr));
+      emit_insn (gen_add2_insn (this_rtx, temp1));
+    }
+
+  /* Generate a tail call to the target function.  */
+  if (!TREE_USED (function))
+    {
+      assemble_external (function);
+      TREE_USED (function) = 1;
+    }
+
+  funexp = XEXP (DECL_RTL (function), 0);
+  funexp = gen_rtx_MEM (FUNCTION_MODE, funexp);
+  insn = emit_call_insn (gen_sibcall (funexp, const0_rtx));
+  SIBLING_CALL_P (insn) = 1;
+
+  insn = get_insns ();
+  shorten_branches (insn);
+  assemble_start_function (thunk, fnname);
+  final_start_function (insn, file, 1);
+  final (insn, file, 1);
+  final_end_function ();
+  assemble_end_function (thunk, fnname);
+
+  /* Stop pretending to be a post-reload pass.  */
+  reload_completed = 0;
 }
 
 #include "gt-xtensa.h"

@@ -1625,6 +1625,38 @@
    (set_attr "mode"	"none")
    (set_attr "length"	"3")])
 
+(define_expand "sibcall"
+  [(parallel [(call (match_operand 0 "memory_operand" "")
+		    (match_operand 1 "" ""))
+	      (return)])]
+  ""
+{
+})
+
+(define_insn "sibcall_internal1"
+  [(call (mem (match_operand:SI 0 "" ""))
+	 (match_operand 1 "" ""))
+   (return)]
+  "SIBLING_CALL_P (insn)"
+{
+  xtensa_emit_sibcall (0, operands);
+  return "";
+}
+  [(set_attr "type"	"jump")
+   (set_attr "mode"	"none")])
+
+(define_insn "sibcall_internal"
+  [(call (mem (match_operand:SI 0 "call_insn_operand" "nir"))
+	 (match_operand 1 "" ""))
+   (return)]
+  "SIBLING_CALL_P (insn)"
+{
+  xtensa_emit_sibcall (0, operands);
+  return "";
+}
+  [(set_attr "type"	"jump")
+   (set_attr "mode"	"none")])
+
 (define_expand "call_value"
   [(set (match_operand 0 "register_operand" "")
 	(call (match_operand 1 "memory_operand" "")
