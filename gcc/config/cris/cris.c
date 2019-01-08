@@ -2762,6 +2762,9 @@ cris_asm_output_mi_thunk (FILE *stream,
 			  HOST_WIDE_INT vcall_offset ATTRIBUTE_UNUSED,
 			  tree funcdecl)
 {
+  const char *fnname = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (thunkdecl));
+
+  assemble_start_function (thunkdecl, fnname);
   /* Make sure unwind info is emitted for the thunk if needed.  */
   final_start_function (emit_barrier (), stream, 1);
 
@@ -2804,6 +2807,7 @@ cris_asm_output_mi_thunk (FILE *stream,
     }
 
   final_end_function ();
+  assemble_end_function (thunkdecl, fnname);
 }
 
 /* Boilerplate emitted at start of file.
