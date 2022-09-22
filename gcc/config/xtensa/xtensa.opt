@@ -71,3 +71,7 @@ Use windowed registers ABI.
 mstrict-align
 Target Var(xtensa_strict_alignment) Init(XTENSA_STRICT_ALIGNMENT_UNDEFINED)
 Do not use unaligned memory references.
+
+mfdpic
+Target Mask(FDPIC)
+Generate FDPIC code.

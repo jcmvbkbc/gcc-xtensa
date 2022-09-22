@@ -49,7 +49,9 @@ along with GCC; see the file COPYING3.  If not see
   %{mauto-litpools:--auto-litpools} \
   %{mno-auto-litpools:--no-auto-litpools} \
   %{mabi=windowed:--abi-windowed} \
-  %{mabi=call0:--abi-call0}"
+  %{mabi=call0:--abi-call0} \
+  %{mfdpic:--fdpic} \
+  %{mno-fdpic:--no-fdpic}"
 
 #undef LIB_SPEC
 #define LIB_SPEC "-lc -lsim -lc -lhandlers-sim -lhal"
