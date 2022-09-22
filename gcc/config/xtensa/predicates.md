@@ -150,6 +150,7 @@
 			    || ! xtensa_split1_finished_p ()"))
 	  (and (match_code "const_int,const_double,const,symbol_ref,label_ref")
 	       (match_test "(TARGET_CONST16 || TARGET_AUTO_LITPOOLS)
+			    && (!TARGET_FDPIC || xtensa_legitimate_pic_operand_p (op))
 			    && CONSTANT_P (op)")))))
 
 ;; Accept the floating point constant 1 in the appropriate mode.
