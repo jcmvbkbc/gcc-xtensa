@@ -3603,6 +3603,19 @@ xtensa*-*-elf*)
 xtensa*-*-linux*)
 	tm_file="${tm_file} elfos.h gnu-user.h linux.h glibc-stdint.h xtensa/linux.h"
 	tmake_file="${tmake_file} xtensa/t-xtensa"
+	case ${target} in
+	xtensa*-*-*fdpic)
+		tm_file="${tm_file} xtensa/fdpic.h"
+		;;
+	esac
+	case ${target} in
+	xtensa*-*-muslfdpic)
+		tm_file="${tm_file} xtensa/muslfdpic.h"
+		;;
+	xtensa*-*-uclibcfdpic)
+		tm_file="${tm_file} xtensa/uclibcfdpic.h"
+		;;
+	esac
 	;;
 xtensa*-*-uclinux*)
 	tm_file="${tm_file} elfos.h gnu-user.h linux.h glibc-stdint.h xtensa/uclinux.h"

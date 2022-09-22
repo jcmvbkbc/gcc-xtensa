@@ -1,0 +1,6 @@
+# Use unwind-dw2-fde as there's no elf-fdpic.h in musl
+
+LIB2ADDEH_XTENSA_UNWIND_DW2_FDE = $(srcdir)/unwind-dw2-fde.c
+
+LIB2ADDEH = $(srcdir)/unwind-dw2.c $(srcdir)/unwind-dw2-fde.c \
+  $(srcdir)/unwind-sjlj.c $(srcdir)/unwind-c.c
