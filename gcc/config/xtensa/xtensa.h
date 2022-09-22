@@ -75,6 +75,8 @@ along with GCC; see the file COPYING3.  If not see
     builtin_assert ("machine=xtensa");					\
     builtin_define ("__xtensa__");					\
     builtin_define ("__XTENSA__");					\
+    if (TARGET_FDPIC)							\
+      builtin_define ("__FDPIC__");					\
     builtin_define (TARGET_WINDOWED_ABI ?				\
 		    "__XTENSA_WINDOWED_ABI__" : "__XTENSA_CALL0_ABI__");\
     builtin_define (TARGET_BIG_ENDIAN ? "__XTENSA_EB__" : "__XTENSA_EL__"); \
@@ -605,14 +607,15 @@ typedef struct xtensa_args
     || GET_CODE (X) == CONST_INT || GET_CODE (X) == HIGH		\
     || (GET_CODE (X) == CONST)))
 
+#define PIC_OFFSET_TABLE_REGNUM 11
+
+#define PIC_OFFSET_TABLE_REG_CALL_CLOBBERED 1
+
 /* A C expression that is nonzero if X is a legitimate immediate
    operand on the target machine when generating position independent
    code.  */
 #define LEGITIMATE_PIC_OPERAND_P(X)					\
-  ((GET_CODE (X) != SYMBOL_REF						\
-    || (SYMBOL_REF_LOCAL_P (X) && !SYMBOL_REF_EXTERNAL_P (X)))		\
-   && GET_CODE (X) != LABEL_REF						\
-   && GET_CODE (X) != CONST)
+  xtensa_legitimate_pic_operand_p (X)
 
 /* Specify the machine mode that this machine uses
    for the index in the tablejump instruction.  */
@@ -766,6 +769,20 @@ typedef struct xtensa_args
    a MOVI and let the assembler relax it -- for the .init and .fini
    sections, the assembler knows to put the literal in the right
    place.  */
+#ifdef __FDPIC__
+#if defined(__XTENSA_WINDOWED_ABI__)
+#error Unsupported ABI
+#elif defined(__XTENSA_CALL0_ABI__)
+#define CRT_CALL_STATIC_FUNCTION(SECTION_OP, FUNC) \
+    asm (SECTION_OP "\n\
+	movi\ta0, " USER_LABEL_PREFIX #FUNC "@GOTOFFFUNCDESC\n\
+	add\ta0, a0, a12\n\
+	l32i\ta0, a0, 0\n\
+	mov\ta11, a12\n\
+	callx0\ta0\n" \
+	TEXT_SECTION_ASM_OP);
+#endif
+#else
 #if defined(__XTENSA_WINDOWED_ABI__)
 #define CRT_CALL_STATIC_FUNCTION(SECTION_OP, FUNC) \
     asm (SECTION_OP "\n\
@@ -778,4 +795,5 @@ typedef struct xtensa_args
 	movi\ta0, " USER_LABEL_PREFIX #FUNC "\n\
 	callx0\ta0\n" \
 	TEXT_SECTION_ASM_OP);
+#endif
 #endif
