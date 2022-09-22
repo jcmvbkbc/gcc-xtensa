@@ -1540,8 +1540,16 @@ xtensa*-*-elf*)
 	extra_parts="$extra_parts crti.o crtn.o"
 	;;
 xtensa*-*-linux*)
-	tmake_file="$tmake_file xtensa/t-xtensa xtensa/t-linux t-slibgcc-libgcc"
+	case ${host} in
+	xtensa*-*-muslfdpic)
+		tmake_file="$tmake_file xtensa/t-xtensa xtensa/t-linux xtensa/t-muslfdpic t-slibgcc-libgcc"
+		;;
+	*)
+		tmake_file="$tmake_file xtensa/t-xtensa xtensa/t-linux t-slibgcc-libgcc"
+		;;
+	esac
 	md_unwind_header=xtensa/linux-unwind.h
+	tm_file="$tm_file xtensa/elf-lib.h"
 	;;
 xtensa*-*-uclinux*)
 	tmake_file="$tmake_file xtensa/t-xtensa xtensa/t-linux t-slibgcc-libgcc"
