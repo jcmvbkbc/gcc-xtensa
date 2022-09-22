@@ -25,6 +25,7 @@
   (A7_REG		7)
   (A8_REG		8)
   (A9_REG		9)
+  (FDPIC_REG		11)
 ])
 
 (define_c_enum "unspec" [
@@ -32,7 +33,13 @@
   UNSPEC_PLT
   UNSPEC_RET_ADDR
   UNSPEC_TPOFF
+  UNSPEC_GOTTPOFF
   UNSPEC_DTPOFF
+  UNSPEC_TLS_DESCRIPTOR
+  UNSPEC_TLS_FUNCDESC
+  UNSPEC_TLS_GOT
+  UNSPEC_TLS_TPOFF_PTR
+  UNSPEC_TLS_TPOFF
   UNSPEC_TLS_FUNC
   UNSPEC_TLS_ARG
   UNSPEC_TLS_CALL
@@ -41,6 +48,9 @@
   UNSPEC_LSETUP_START
   UNSPEC_LSETUP_END
   UNSPEC_FRAME_BLOCKAGE
+  UNSPEC_GOT
+  UNSPEC_GOT_FUNCDESC
+  UNSPEC_LITERAL
 ])
 
 (define_c_enum "unspecv" [
@@ -2603,12 +2613,27 @@
   ""
   "")
 
+(define_expand "sym_GOT"
+  [(const (unspec [(match_operand:SI 0 "" "")] UNSPEC_GOT))]
+  ""
+  "")
+
+(define_expand "sym_GOT_FUNCDESC"
+  [(const (unspec [(match_operand:SI 0 "" "")] UNSPEC_GOT_FUNCDESC))]
+  ""
+  "")
+
+(define_expand "sym_LITERAL"
+  [(const (unspec [(match_operand:SI 0 "" "")] UNSPEC_LITERAL))]
+  ""
+  "")
+
 (define_expand "call"
   [(call (match_operand 0 "memory_operand" "")
 	 (match_operand 1 "" ""))]
   ""
 {
-  xtensa_expand_call (0, operands);
+  xtensa_expand_call (0, operands, false);
   DONE;
 })
 
@@ -2629,7 +2654,7 @@
 	      (match_operand 2 "" "")))]
   ""
 {
-  xtensa_expand_call (1, operands);
+  xtensa_expand_call (1, operands, false);
   DONE;
 })
 
@@ -2650,7 +2675,7 @@
 	 (match_operand 1 "" ""))]
   "!TARGET_WINDOWED_ABI"
 {
-  xtensa_expand_call (0, operands);
+  xtensa_expand_call (0, operands, true);
   DONE;
 })
 
@@ -2671,7 +2696,7 @@
 	      (match_operand 2 "" "")))]
   "!TARGET_WINDOWED_ABI"
 {
-  xtensa_expand_call (1, operands);
+  xtensa_expand_call (1, operands, true);
   DONE;
 })
 
@@ -2959,6 +2984,11 @@
   ""
   "")
 
+(define_expand "sym_GOTTPOFF"
+  [(const (unspec [(match_operand:SI 0 "" "")] UNSPEC_GOTTPOFF))]
+  ""
+  "")
+
 (define_expand "sym_DTPOFF"
   [(const (unspec [(match_operand:SI 0 "" "")] UNSPEC_DTPOFF))]
   ""
@@ -2997,7 +3027,12 @@
 	(unspec:SI [(match_operand:SI 1 "tls_symbol_operand" "")]
 		   UNSPEC_TLS_ARG))]
   "TARGET_THREADPTR && HAVE_AS_TLS"
-  "movi\t%0, %1@TLSARG"
+{
+  if (TARGET_FDPIC)
+    return "movi\t%0, %1@GOTTLSDESC";
+  else
+    return "movi\t%0, %1@TLSARG";
+}
   [(set_attr "type"	"load")
    (set_attr "mode"	"SI")
    (set_attr "length"	"3")])
@@ -3017,6 +3052,74 @@
 }
   [(set_attr "type"	"call")
    (set_attr "mode"	"none")
+   (set_attr "length"	"3")])
+
+(define_insn "tlsgd_add"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+        (plus:SI (match_operand:SI 1 "register_operand" "r")
+		 (unspec:SI [(match_operand:SI 2 "register_operand" "r")
+			     (match_operand:SI 3 "tls_symbol_operand" "")]
+			     UNSPEC_TLS_DESCRIPTOR)))]
+  "TARGET_THREADPTR && HAVE_AS_TLS"
+  ".reloc\t., R_XTENSA_TLS_ARG, %3\;add\t%0, %1, %2"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
+
+(define_insn "tlsgd_ld_funcdesc"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(mem:SI (unspec:SI [(match_operand:SI 1 "register_operand" "r")
+			    (match_operand:SI 2 "tls_symbol_operand" "")]
+			    UNSPEC_TLS_FUNCDESC)))]
+  "TARGET_THREADPTR && HAVE_AS_TLS"
+  ".reloc\t., R_XTENSA_TLS_FUNCDESC, %2\;l32i\t%0, %1, 0"
+  [(set_attr "type"	"load")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
+
+(define_insn "tlsgd_ld_got"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(mem:SI (unspec:SI [(match_operand:SI 1 "register_operand" "r")
+			    (match_operand:SI 2 "tls_symbol_operand" "")]
+			    UNSPEC_TLS_GOT)))]
+  "TARGET_THREADPTR && HAVE_AS_TLS"
+  ".reloc\t., R_XTENSA_TLS_GOT, %2\;l32i\t%0, %1, 4"
+  [(set_attr "type"	"load")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
+
+(define_insn "tlsgd_ld_func"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(mem:SI (unspec:SI [(match_operand:SI 1 "register_operand" "r")
+			    (match_operand:SI 2 "tls_symbol_operand" "")]
+			    UNSPEC_TLS_FUNC)))]
+  "TARGET_THREADPTR && HAVE_AS_TLS"
+  ".reloc\t., R_XTENSA_TLS_FUNC, %2\;_l32i\t%0, %1, 0"
+  [(set_attr "type"	"load")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
+
+(define_insn "tlsie_add"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+        (plus:SI (match_operand:SI 1 "register_operand" "r")
+		 (unspec:SI [(match_operand:SI 2 "register_operand" "r")
+			     (match_operand:SI 3 "tls_symbol_operand" "")]
+			     UNSPEC_TLS_TPOFF_PTR)))]
+  "TARGET_THREADPTR && HAVE_AS_TLS"
+  ".reloc\t., R_XTENSA_TLS_TPOFF_PTR, %3\;add\t%0, %1, %2"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
+
+(define_insn "tlsie_ld_tpoff"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(mem:SI (unspec:SI [(match_operand:SI 1 "register_operand" "r")
+			    (match_operand:SI 2 "tls_symbol_operand" "")]
+			    UNSPEC_TLS_TPOFF)))]
+  "TARGET_THREADPTR && HAVE_AS_TLS"
+  ".reloc\t., R_XTENSA_TLS_TPOFF_LOAD, %2\;l32i\t%0, %1, 0"
+  [(set_attr "type"	"load")
+   (set_attr "mode"	"SI")
    (set_attr "length"	"3")])
 
 

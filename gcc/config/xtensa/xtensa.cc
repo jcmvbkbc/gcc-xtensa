@@ -154,6 +154,7 @@ static bool xtensa_frame_pointer_required (void);
 static rtx xtensa_static_chain (const_tree, bool);
 static void xtensa_asm_trampoline_template (FILE *);
 static void xtensa_trampoline_init (rtx, tree, rtx);
+static bool xtensa_assemble_integer (rtx, unsigned int, int);
 static bool xtensa_output_addr_const_extra (FILE *, rtx);
 static bool xtensa_cannot_force_const_mem (machine_mode, rtx);
 
@@ -299,6 +300,9 @@ static rtx xtensa_delegitimize_address (rtx);
 
 #undef TARGET_OPTION_OVERRIDE
 #define TARGET_OPTION_OVERRIDE xtensa_option_override
+
+#undef  TARGET_ASM_INTEGER
+#define TARGET_ASM_INTEGER xtensa_assemble_integer
 
 #undef TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA
 #define TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA xtensa_output_addr_const_extra
@@ -625,6 +629,17 @@ xtensa_tls_symbol_p (rtx x)
   return GET_CODE (x) == SYMBOL_REF && SYMBOL_REF_TLS_MODEL (x) != 0;
 }
 
+bool
+xtensa_legitimate_pic_operand_p (rtx x)
+{
+  poly_int64 offset;
+
+  x = xtensa_delegitimize_address (x);
+  x = strip_offset (x, &offset);
+  if (SYMBOL_REF_P (x) || LABEL_REF_P (x))
+    return false;
+  return true;
+}
 
 void
 xtensa_extend_reg (rtx dst, rtx src)
@@ -1259,6 +1274,152 @@ xtensa_constantsynth (rtx dst, HOST_WIDE_INT srcval)
   return 0;
 }
 
+/* Try to determine whether an object, referenced via ORIG, will be
+   placed in the text or data segment.  This is used in FDPIC mode, to
+   decide which relocations to use when accessing ORIG.  *IS_READONLY
+   is set to true if ORIG is a read-only location, false otherwise.
+   Return true if we could determine the location of ORIG, false
+   otherwise.  *IS_READONLY is valid only when we return true.  */
+static bool
+xtensa_is_segment_info_known (rtx orig, bool *is_readonly)
+{
+  *is_readonly = false;
+
+  if (LABEL_REF_P (orig))
+    {
+      *is_readonly = true;
+      return true;
+    }
+
+  if (SYMBOL_REF_P (orig))
+    {
+      if (CONSTANT_POOL_ADDRESS_P (orig) || SYMBOL_REF_FUNCTION_P (orig))
+	{
+	  *is_readonly = true;
+	  return true;
+	}
+      if (SYMBOL_REF_LOCAL_P (orig)
+	  && !SYMBOL_REF_EXTERNAL_P (orig)
+	  && SYMBOL_REF_DECL (orig)
+	  && (!DECL_P (SYMBOL_REF_DECL (orig))
+	      || !DECL_COMMON (SYMBOL_REF_DECL (orig))))
+	{
+	  tree decl = SYMBOL_REF_DECL (orig);
+	  tree init = (TREE_CODE (decl) == VAR_DECL)
+	    ? DECL_INITIAL (decl) : (TREE_CODE (decl) == CONSTRUCTOR)
+	    ? decl : 0;
+	  int reloc = 0;
+	  bool named_section, readonly;
+
+	  if (init && init != error_mark_node)
+	    reloc = compute_reloc_for_constant (init);
+
+	  named_section = TREE_CODE (decl) == VAR_DECL
+	    && lookup_attribute ("section", DECL_ATTRIBUTES (decl));
+	  readonly = decl_readonly_section (decl, reloc);
+
+	  /* We don't know where the link script will put a named
+	     section, so return false in such a case.  */
+	  if (named_section)
+	    return false;
+
+	  *is_readonly = readonly;
+	  return true;
+	}
+
+      /* We don't know.  */
+      return false;
+    }
+
+  gcc_unreachable ();
+}
+
+static rtx_insn *
+xtensa_fdpic_load_static_addr_ro (rtx dst, rtx src, rtx initial_fdpic_reg,
+				  rtx tmp1, rtx tmp2)
+{
+  gcc_assert (tmp1 != tmp2);
+
+  emit_move_insn (tmp1, gen_sym_LITERAL (src));
+  emit_move_insn (tmp2,
+		  gen_rtx_MEM (Pmode, plus_constant (Pmode, initial_fdpic_reg, 12)));
+  return emit_insn (gen_addsi3 (dst, tmp1, tmp2));
+}
+
+/* Generate code to load the address of a static var under FDPIC.  */
+static rtx_insn *
+xtensa_pic_static_addr (rtx dst, rtx src)
+{
+  rtx_insn *insn;
+  rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
+  rtx tmp1 = can_create_pseudo_p () ? gen_reg_rtx (Pmode) : dst;
+  rtx tmp2 = can_create_pseudo_p () ? gen_reg_rtx (Pmode) : dst;
+  bool is_readonly;
+  bool segment_info_known = xtensa_is_segment_info_known (src, &is_readonly);
+
+  if (segment_info_known && is_readonly && tmp1 != tmp2
+      && (!SYMBOL_REF_P (src) || !SYMBOL_REF_FUNCTION_P (src)))
+    {
+      insn = xtensa_fdpic_load_static_addr_ro (dst, src, initial_fdpic_reg, tmp1, tmp2);
+    }
+  else
+    {
+      rtx got_src = SYMBOL_REF_P (src) && SYMBOL_REF_FUNCTION_P (src)
+	? gen_sym_GOT_FUNCDESC (src) : gen_sym_GOT (src);
+
+      emit_move_insn (tmp1, got_src);
+      emit_insn (gen_addsi3 (tmp2, tmp1, initial_fdpic_reg));
+      if (LABEL_REF_P (src)
+	  || (SYMBOL_REF_FUNCTION_P (src) && !SYMBOL_REF_LOCAL_P (src))
+	  || (!SYMBOL_REF_FUNCTION_P (src)
+	      && (!SYMBOL_REF_LOCAL_P (src)
+		  || !segment_info_known || is_readonly)))
+	insn = emit_move_insn (dst, gen_rtx_MEM (Pmode, tmp2));
+      else
+	insn = emit_move_insn (dst, tmp2);
+    }
+  return insn;
+}
+
+static rtx
+legitimize_pic_address (rtx orig, rtx reg)
+{
+  if (!reg)
+    {
+      gcc_assert (can_create_pseudo_p ());
+      reg = gen_reg_rtx (Pmode);
+    }
+
+  if (SYMBOL_REF_P (orig) || LABEL_REF_P (orig))
+    {
+      rtx_insn *insn = xtensa_pic_static_addr (reg, orig);
+
+      // breaks generated code
+      set_unique_reg_note (insn, REG_EQUAL, orig);
+      return reg;
+    }
+  else if (GET_CODE (orig) == CONST)
+    {
+      rtx base, offset;
+
+      gcc_assert (GET_CODE (XEXP (orig, 0)) == PLUS);
+
+      base = legitimize_pic_address (XEXP (XEXP (orig, 0), 0), reg);
+      offset = legitimize_pic_address (XEXP (XEXP (orig, 0), 1),
+				       reg == base ? NULL : reg);
+
+      if (CONST_INT_P (offset)
+	  && (xtensa_simm8 (INTVAL (offset))
+	      || xtensa_simm8x256 (INTVAL (offset))))
+	return plus_constant (Pmode, base, INTVAL (offset));
+      else
+	offset = force_reg (SImode, offset);
+
+      return gen_rtx_PLUS (Pmode, base, offset);
+    }
+
+  return orig;
+}
 
 /* Emit insns to move operands[1] into operands[0].
    Return 1 if we have written out everything that needs to be done to
@@ -1292,6 +1453,12 @@ xtensa_emit_move_sequence (rtx *operands, machine_mode mode)
 	      src = force_operand (src, dst);
 	    }
 	  emit_move_insn (dst, src);
+	  return 1;
+	}
+      else if (TARGET_FDPIC && !xtensa_legitimate_pic_operand_p (src))
+	{
+	  rtx tmp = legitimize_pic_address (src, can_create_pseudo_p () ? NULL : dst);
+	  emit_move_insn (dst, tmp);
 	  return 1;
 	}
 
@@ -2238,28 +2405,95 @@ xtensa_emit_movcc (bool inverted, bool isfp, bool isbool, rtx *operands)
   return result;
 }
 
+static rtx
+xtensa_make_indirect_call_reg (rtx addr)
+{
+  /* This may be called while generating MI thunk when we pretend
+     that reload is over.  Use a8 as a temporary register in that case.  */
+  rtx reg = can_create_pseudo_p ()
+    ? copy_to_mode_reg (Pmode, addr)
+    : copy_to_suggested_reg (addr,
+			     gen_rtx_REG (Pmode, A8_REG),
+			     Pmode);
+  return reg;
+}
+
+static rtx
+xtensa_prepare_fdpic_call (rtx addr, bool sibcall)
+{
+  rtx reg;
+  bool symbol = SYMBOL_REF_P (addr);
+  bool local = symbol && SYMBOL_REF_LOCAL_P (addr);
+  rtx fdpic_reg = gen_rtx_REG (Pmode, FDPIC_REG);
+  rtx initial_fdpic_reg;
+
+  if (can_create_pseudo_p ())
+    {
+      initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
+    }
+  else
+    {
+      /* It should only happen in the MI thunk and thus the call must be
+	 a sibcall and FDPIC register must hold its initial value.  */
+      gcc_assert (sibcall);
+      initial_fdpic_reg = fdpic_reg;
+    }
+
+  if (local)
+    {
+      rtx tmp;
+
+      if (can_create_pseudo_p ())
+	{
+	  reg = gen_reg_rtx (Pmode);
+	  tmp = gen_reg_rtx (Pmode);
+	}
+      else
+	{
+	  reg = gen_rtx_REG (Pmode, A8_REG);
+	  tmp = gen_rtx_REG (Pmode, A9_REG);
+	}
+
+      xtensa_fdpic_load_static_addr_ro (reg, addr, initial_fdpic_reg, reg, tmp);
+      emit_move_insn (fdpic_reg, initial_fdpic_reg);
+    }
+  else
+    {
+      if (symbol)
+	addr = gen_sym_GOT_FUNCDESC (addr);
+      reg = xtensa_make_indirect_call_reg (addr);
+      if (symbol)
+	{
+	  emit_insn (gen_addsi3 (reg, reg, initial_fdpic_reg));
+	  emit_move_insn (reg, gen_rtx_MEM (Pmode, reg));
+	}
+      emit_move_insn (fdpic_reg,
+		      gen_rtx_MEM (Pmode, plus_constant (Pmode, reg, 4)));
+      emit_move_insn (reg, gen_rtx_MEM (Pmode, reg));
+    }
+  return reg;
+}
+
 
 void
-xtensa_expand_call (int callop, rtx *operands)
+xtensa_expand_call (int callop, rtx *operands, bool sibcall)
 {
   rtx call;
   rtx_insn *call_insn;
   rtx addr = XEXP (operands[callop], 0);
 
-  if (flag_pic && SYMBOL_REF_P (addr)
-      && (!SYMBOL_REF_LOCAL_P (addr) || SYMBOL_REF_EXTERNAL_P (addr)))
-    addr = gen_sym_PLT (addr);
-
-  if (!call_insn_operand (addr, VOIDmode))
+  if (TARGET_FDPIC)
     {
-      /* This may be called while generating MI thunk when we pretend
-	 that reload is over.  Use a8 as a temporary register in that case.  */
-      rtx reg = can_create_pseudo_p ()
-	? copy_to_mode_reg (Pmode, addr)
-	: copy_to_suggested_reg (addr,
-				 gen_rtx_REG (Pmode, A8_REG),
-				 Pmode);
-      XEXP (operands[callop], 0) = reg;
+      XEXP (operands[callop], 0) = xtensa_prepare_fdpic_call (addr, sibcall);
+    }
+  else
+    {
+      if (flag_pic && SYMBOL_REF_P (addr)
+	  && (!SYMBOL_REF_LOCAL_P (addr) || SYMBOL_REF_EXTERNAL_P (addr)))
+	addr = gen_sym_PLT (addr);
+
+      if (!call_insn_operand (addr, VOIDmode))
+	XEXP (operands[callop], 0) = xtensa_make_indirect_call_reg (addr);
     }
 
   call = gen_rtx_CALL (VOIDmode, operands[callop], operands[callop + 1]);
@@ -2268,6 +2502,13 @@ xtensa_expand_call (int callop, rtx *operands)
     call = gen_rtx_SET (operands[0], call);
 
   call_insn = emit_call_insn (call);
+
+  if (TARGET_FDPIC)
+    {
+      rtx fdpic_reg = gen_rtx_REG (Pmode, FDPIC_REG);
+
+      use_reg (&CALL_INSN_FUNCTION_USAGE (call_insn), fdpic_reg);
+    }
 
   if (TARGET_WINDOWED_ABI)
     {
@@ -2283,7 +2524,6 @@ xtensa_expand_call (int callop, rtx *operands)
 	gen_rtx_EXPR_LIST (Pmode, clob, CALL_INSN_FUNCTION_USAGE (call_insn));
     }
 }
-
 
 char *
 xtensa_emit_call (int callop, rtx *operands)
@@ -2398,15 +2638,34 @@ xtensa_call_tls_desc (rtx sym, rtx *retp)
   rtx_insn *call_insn, *insns;
 
   start_sequence ();
-  fn = gen_reg_rtx (Pmode);
   arg = gen_reg_rtx (Pmode);
   a_io = gen_rtx_REG (Pmode, WINDOW_SIZE + 2);
 
-  emit_insn (gen_tls_func (fn, sym));
-  emit_insn (gen_tls_arg (arg, sym));
-  emit_move_insn (a_io, arg);
-  call_insn = emit_call_insn (gen_tls_call (a_io, fn, sym, const1_rtx));
-  use_reg (&CALL_INSN_FUNCTION_USAGE (call_insn), a_io);
+  if (TARGET_FDPIC)
+    {
+      rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
+      rtx fdpic_reg = gen_rtx_REG (Pmode, FDPIC_REG);
+      rtx tls_funcdesc = gen_reg_rtx (Pmode);
+      rtx tls_func = gen_reg_rtx (Pmode);
+
+      emit_insn (gen_tls_arg (arg, sym));
+      emit_insn (gen_tlsgd_add (a_io, arg, initial_fdpic_reg, sym));
+      emit_insn (gen_tlsgd_ld_funcdesc (tls_funcdesc, a_io, sym));
+      emit_insn (gen_tlsgd_ld_got (fdpic_reg, tls_funcdesc, sym));
+      emit_insn (gen_tlsgd_ld_func (tls_func, tls_funcdesc, sym));
+      call_insn = emit_call_insn (gen_tls_call (a_io, tls_func, sym, const1_rtx));
+      use_reg (&CALL_INSN_FUNCTION_USAGE (call_insn), a_io);
+      use_reg (&CALL_INSN_FUNCTION_USAGE (call_insn), fdpic_reg);
+    }
+  else
+    {
+      fn = gen_reg_rtx (Pmode);
+      emit_insn (gen_tls_func (fn, sym));
+      emit_insn (gen_tls_arg (arg, sym));
+      emit_move_insn (a_io, arg);
+      call_insn = emit_call_insn (gen_tls_call (a_io, fn, sym, const1_rtx));
+      use_reg (&CALL_INSN_FUNCTION_USAGE (call_insn), a_io);
+    }
   insns = get_insns ();
   end_sequence ();
 
@@ -2443,7 +2702,26 @@ xtensa_legitimize_tls_address (rtx x)
     case TLS_MODEL_LOCAL_EXEC:
       tp = gen_reg_rtx (SImode);
       emit_insn (gen_get_thread_pointersi (tp));
-      addend = force_reg (SImode, gen_sym_TPOFF (x));
+      if (TARGET_FDPIC)
+	{
+	  rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
+	  rtx tmp = gen_reg_rtx (Pmode);
+
+	  if (model == TLS_MODEL_INITIAL_EXEC)
+	    {
+	      addend = force_reg (SImode, gen_sym_GOTTPOFF (x));
+	      emit_insn (gen_tlsie_add (tmp, addend, initial_fdpic_reg, x));
+	      emit_insn (gen_tlsie_ld_tpoff (addend, tmp, x));
+	    }
+	  else
+	    {
+	      addend = force_reg (SImode, gen_sym_TPOFF (x));
+	    }
+	}
+      else
+	{
+	  addend = force_reg (SImode, gen_sym_TPOFF (x));
+	}
       emit_insn (gen_addsi3 (dest, tp, addend));
       break;
 
@@ -2530,6 +2808,7 @@ xtensa_tls_referenced_p (rtx x)
 	switch (XINT (x, 1))
 	  {
 	  case UNSPEC_TPOFF:
+	  case UNSPEC_GOTTPOFF:
 	  case UNSPEC_DTPOFF:
 	  case UNSPEC_TLS_FUNC:
 	  case UNSPEC_TLS_ARG:
@@ -2683,6 +2962,11 @@ xtensa_match_CLAMPS_imms_p (rtx cst_max, rtx cst_min)
 static bool
 xtensa_cannot_force_const_mem (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 {
+  rtx base, offset;
+  split_const (x, &base, &offset);
+
+  if (TARGET_FDPIC && SYMBOL_REF_P (base))
+    return true;
   return xtensa_tls_referenced_p (x);
 }
 
@@ -3206,6 +3490,22 @@ print_operand_address (FILE *file, rtx addr)
     }
 }
 
+static bool
+xtensa_assemble_integer (rtx x, unsigned int size, int aligned_p)
+{
+  if (flag_pic && TARGET_FDPIC)
+    {
+      if (SYMBOL_REF_P (x) && SYMBOL_REF_FUNCTION_P (x))
+	{
+	  fputs ("\t.word\t", asm_out_file);
+	  output_addr_const (asm_out_file, x);
+	  fputs ("@FUNCDESC\n", asm_out_file);
+	  return true;
+	}
+    }
+  return default_assemble_integer (x, size, aligned_p);
+}
+
 /* Implement TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA.  */
 
 static bool
@@ -3219,6 +3519,10 @@ xtensa_output_addr_const_extra (FILE *fp, rtx x)
 	  output_addr_const (fp, XVECEXP (x, 0, 0));
 	  fputs ("@TPOFF", fp);
 	  return true;
+	case UNSPEC_GOTTPOFF:
+	  output_addr_const (fp, XVECEXP (x, 0, 0));
+	  fputs ("@GOTTPOFF", fp);
+	  return true;
 	case UNSPEC_DTPOFF:
 	  output_addr_const (fp, XVECEXP (x, 0, 0));
 	  fputs ("@DTPOFF", fp);
@@ -3228,6 +3532,47 @@ xtensa_output_addr_const_extra (FILE *fp, rtx x)
 	    {
 	      output_addr_const (fp, XVECEXP (x, 0, 0));
 	      fputs ("@PLT", fp);
+	      return true;
+	    }
+	  break;
+	case UNSPEC_GOT:
+	  if (flag_pic)
+	    {
+	      output_addr_const (fp, XVECEXP (x, 0, 0));
+	      x = XVECEXP (x, 0, 0);
+	      if (SYMBOL_REF_P (x) && (!SYMBOL_REF_LOCAL_P (x)))
+		{
+		  fputs ("@GOT", fp);
+		}
+	      else
+		{
+		  bool is_readonly;
+
+		  if (xtensa_is_segment_info_known (x, &is_readonly)
+		      && !is_readonly)
+		    fputs ("@GOTOFF", fp);
+		  else
+		    fputs ("@GOT", fp);
+		}
+	      return true;
+	    }
+	  break;
+	case UNSPEC_GOT_FUNCDESC:
+	  if (flag_pic)
+	    {
+	      output_addr_const (fp, XVECEXP (x, 0, 0));
+	      x = XVECEXP (x, 0, 0);
+	      if (SYMBOL_REF_LOCAL_P (x))
+		fputs ("@GOTOFFFUNCDESC", fp);
+	      else
+		fputs ("@GOTFUNCDESC", fp);
+	      return true;
+	    }
+	  break;
+	case UNSPEC_LITERAL:
+	  if (flag_pic)
+	    {
+	      output_addr_const (fp, XVECEXP (x, 0, 0));
 	      return true;
 	    }
 	  break;
@@ -4847,6 +5192,10 @@ xtensa_asm_trampoline_template (FILE *stream)
     }
   else
     {
+      if (TARGET_FDPIC)
+	fprintf (stream, "%s0\n%s0\n",
+		 integer_asm_op (4, TRUE),
+		 integer_asm_op (4, TRUE));
       if (use_call0)
 	{
 	  /* Save the return address.  */
@@ -4857,7 +5206,7 @@ xtensa_asm_trampoline_template (FILE *stream)
 	     the constants without relying on L32R.  */
 	  fprintf (stream, "\tcall0\t.Lskipconsts\n");
 	}
-      else
+      else if (!TARGET_FDPIC)
 	fprintf (stream, "\tj\t.Lskipconsts\n");
 
       fprintf (stream, "\t.align\t4\n");
@@ -4878,13 +5227,18 @@ xtensa_asm_trampoline_template (FILE *stream)
 	  fprintf (stream, "\tl32r\ta8, .Lchainval\n");
 	  fprintf (stream, "\tl32r\ta9, .Lfnaddr\n");
 	}
+      if (TARGET_FDPIC)
+	{
+	  fprintf (stream, "\tl32i\ta11, a9, 4\n");
+	  fprintf (stream, "\tl32i\ta9, a9, 0\n");
+	}
       fprintf (stream, "\tjx\ta9\n");
 
       /* Pad size to a multiple of TRAMPOLINE_ALIGNMENT.  */
       if (use_call0)
 	fprintf (stream, "\t.byte\t0\n");
       else
-	fprintf (stream, "\tnop\n");
+	fprintf (stream, "\t.byte\t%s\n", TARGET_FDPIC ? "0" : "0, 0, 0");
     }
   fprintf (stream, "\t.end no-transform\n");
 }
@@ -4897,6 +5251,9 @@ xtensa_trampoline_init (rtx m_tramp, tree fndecl, rtx chain)
   int chain_off;
   int func_off;
 
+  emit_block_move (m_tramp, assemble_trampoline_template (),
+		   GEN_INT (TRAMPOLINE_SIZE), BLOCK_OP_NORMAL);
+
   if (TARGET_WINDOWED_ABI)
     {
       chain_off = use_call0 ? 12 : 8;
@@ -4908,8 +5265,18 @@ xtensa_trampoline_init (rtx m_tramp, tree fndecl, rtx chain)
       func_off = use_call0 ? 12 : 8;
     }
 
-  emit_block_move (m_tramp, assemble_trampoline_template (),
-		   GEN_INT (TRAMPOLINE_SIZE), BLOCK_OP_NORMAL);
+  if (TARGET_FDPIC)
+    {
+      rtx a = force_reg (Pmode, plus_constant (Pmode, XEXP (m_tramp, 0),
+					       use_call0 ? 8 : 16));
+
+      emit_move_insn (adjust_address (m_tramp, SImode, 0), a);
+      emit_move_insn (adjust_address (m_tramp, SImode, 4),
+		      get_hard_reg_initial_val (Pmode, FDPIC_REG));
+
+      chain_off = use_call0 ? 16 : 8;
+      func_off = use_call0 ? 20 : 12;
+    }
 
   emit_move_insn (adjust_address (m_tramp, SImode, chain_off), chain);
   emit_move_insn (adjust_address (m_tramp, SImode, func_off), func);
@@ -5190,6 +5557,9 @@ xtensa_conditional_register_usage (void)
      the return address has been saved.  */
   if (!TARGET_WINDOWED_ABI)
     fixed_regs[A0_REG] = 0;
+
+  if (flag_pic && TARGET_FDPIC)
+    fixed_regs[PIC_OFFSET_TABLE_REGNUM] = 1;
 }
 
 /* Map hard register number to register class */
