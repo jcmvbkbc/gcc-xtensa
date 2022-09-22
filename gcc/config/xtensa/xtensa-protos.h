@@ -36,6 +36,7 @@ extern int xt_true_regnum (rtx);
 extern int xtensa_valid_move (machine_mode, rtx *);
 extern int smalloffset_mem_p (rtx);
 extern int constantpool_mem_p (rtx);
+extern bool xtensa_legitimate_pic_operand_p (rtx);
 extern void xtensa_extend_reg (rtx, rtx);
 extern void xtensa_expand_conditional_branch (rtx *, machine_mode);
 extern int xtensa_expand_conditional_move (rtx *, int);

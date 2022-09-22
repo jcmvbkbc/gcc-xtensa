@@ -153,6 +153,7 @@ static bool xtensa_frame_pointer_required (void);
 static rtx xtensa_static_chain (const_tree, bool);
 static void xtensa_asm_trampoline_template (FILE *);
 static void xtensa_trampoline_init (rtx, tree, rtx);
+static bool xtensa_assemble_integer (rtx, unsigned int, int);
 static bool xtensa_output_addr_const_extra (FILE *, rtx);
 static bool xtensa_cannot_force_const_mem (machine_mode, rtx);
 
@@ -304,6 +305,9 @@ static rtx xtensa_delegitimize_address (rtx);
 
 #undef TARGET_OPTION_OVERRIDE
 #define TARGET_OPTION_OVERRIDE xtensa_option_override
+
+#undef  TARGET_ASM_INTEGER
+#define TARGET_ASM_INTEGER xtensa_assemble_integer
 
 #undef TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA
 #define TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA xtensa_output_addr_const_extra
@@ -623,6 +627,17 @@ xtensa_tls_symbol_p (rtx x)
   return GET_CODE (x) == SYMBOL_REF && SYMBOL_REF_TLS_MODEL (x) != 0;
 }
 
+bool
+xtensa_legitimate_pic_operand_p (rtx x)
+{
+  poly_int64 offset;
+
+  x = xtensa_delegitimize_address (x);
+  x = strip_offset (x, &offset);
+  if (SYMBOL_REF_P (x))
+    return false;
+  return true;
+}
 
 void
 xtensa_extend_reg (rtx dst, rtx src)
@@ -1230,6 +1245,22 @@ xtensa_emit_move_sequence (rtx *operands, machine_mode mode)
 	      src = force_operand (src, dst);
 	    }
 	  emit_move_insn (dst, src);
+	  return 1;
+	}
+      else if (TARGET_FDPIC && SYMBOL_REF_P (src))
+	{
+	  rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
+	  rtx tmp1 = can_create_pseudo_p () ? gen_reg_rtx (mode) : dst;
+	  rtx tmp2 = can_create_pseudo_p () ? gen_reg_rtx (mode) : dst;
+	  bool local = SYMBOL_REF_LOCAL_P (src);
+
+	  src = gen_sym_GOT (src);
+	  emit_move_insn (tmp1, src);
+	  emit_insn (gen_addsi3 (tmp2, tmp1, initial_fdpic_reg));
+	  if (!local)
+	    emit_move_insn (dst, gen_rtx_MEM (Pmode, tmp2));
+	  else
+	    emit_move_insn (dst, tmp2);
 	  return 1;
 	}
 
@@ -2181,6 +2212,49 @@ xtensa_emit_movcc (bool inverted, bool isfp, bool isbool, rtx *operands)
   return result;
 }
 
+static rtx
+xtensa_make_indirect_call_reg (rtx addr)
+{
+  /* This may be called while generating MI thunk when we pretend
+     that reload is over.  Use a8 as a temporary register in that case.  */
+  rtx reg = can_create_pseudo_p ()
+    ? copy_to_mode_reg (Pmode, addr)
+    : copy_to_suggested_reg (addr,
+			     gen_rtx_REG (Pmode, A8_REG),
+			     Pmode);
+  return reg;
+}
+
+static rtx
+xtensa_prepare_fdpic_call (rtx addr)
+{
+  rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
+  rtx fdpic_reg = gen_rtx_REG (Pmode, FDPIC_REG);
+  rtx reg;
+  bool symbol = SYMBOL_REF_P (addr);
+  bool local = symbol && SYMBOL_REF_LOCAL_P (addr);
+
+  if (symbol)
+    addr = gen_sym_GOT (addr);
+
+  reg = xtensa_make_indirect_call_reg (addr);
+
+  if (symbol)
+    {
+      emit_insn (gen_addsi3 (reg, reg, initial_fdpic_reg));
+      if (!local)
+	emit_move_insn (reg, gen_rtx_MEM (Pmode, reg));
+    }
+
+  if (local)
+    emit_move_insn (fdpic_reg, initial_fdpic_reg);
+  else
+    emit_move_insn (fdpic_reg,
+		    gen_rtx_MEM (Pmode, plus_constant (Pmode, reg, 4)));
+  emit_move_insn (reg, gen_rtx_MEM (Pmode, reg));
+  return reg;
+}
+
 
 void
 xtensa_expand_call (int callop, rtx *operands)
@@ -2189,20 +2263,18 @@ xtensa_expand_call (int callop, rtx *operands)
   rtx_insn *call_insn;
   rtx addr = XEXP (operands[callop], 0);
 
-  if (flag_pic && SYMBOL_REF_P (addr)
-      && (!SYMBOL_REF_LOCAL_P (addr) || SYMBOL_REF_EXTERNAL_P (addr)))
-    addr = gen_sym_PLT (addr);
-
-  if (!call_insn_operand (addr, VOIDmode))
+  if (TARGET_FDPIC)
     {
-      /* This may be called while generating MI thunk when we pretend
-	 that reload is over.  Use a8 as a temporary register in that case.  */
-      rtx reg = can_create_pseudo_p ()
-	? copy_to_mode_reg (Pmode, addr)
-	: copy_to_suggested_reg (addr,
-				 gen_rtx_REG (Pmode, A8_REG),
-				 Pmode);
-      XEXP (operands[callop], 0) = reg;
+      XEXP (operands[callop], 0) = xtensa_prepare_fdpic_call (addr);
+    }
+  else
+    {
+      if (flag_pic && SYMBOL_REF_P (addr)
+	  && (!SYMBOL_REF_LOCAL_P (addr) || SYMBOL_REF_EXTERNAL_P (addr)))
+	addr = gen_sym_PLT (addr);
+
+      if (!call_insn_operand (addr, VOIDmode))
+	XEXP (operands[callop], 0) = xtensa_make_indirect_call_reg (addr);
     }
 
   call = gen_rtx_CALL (VOIDmode, operands[callop], operands[callop + 1]);
@@ -2211,6 +2283,13 @@ xtensa_expand_call (int callop, rtx *operands)
     call = gen_rtx_SET (operands[0], call);
 
   call_insn = emit_call_insn (call);
+
+  if (TARGET_FDPIC)
+    {
+      rtx fdpic_reg = gen_rtx_REG (Pmode, FDPIC_REG);
+
+      use_reg (&CALL_INSN_FUNCTION_USAGE (call_insn), fdpic_reg);
+    }
 
   if (TARGET_WINDOWED_ABI)
     {
@@ -2226,7 +2305,6 @@ xtensa_expand_call (int callop, rtx *operands)
 	gen_rtx_EXPR_LIST (Pmode, clob, CALL_INSN_FUNCTION_USAGE (call_insn));
     }
 }
-
 
 char *
 xtensa_emit_call (int callop, rtx *operands)
@@ -3152,6 +3230,22 @@ print_operand_address (FILE *file, rtx addr)
     }
 }
 
+static bool
+xtensa_assemble_integer (rtx x, unsigned int size, int aligned_p)
+{
+  if (flag_pic && TARGET_FDPIC)
+    {
+      if (SYMBOL_REF_P (x) && SYMBOL_REF_FUNCTION_P (x))
+	{
+	  fputs ("\t.word\t", asm_out_file);
+	  output_addr_const (asm_out_file, x);
+	  fputs ("@FUNCDESC\n", asm_out_file);
+	  return true;
+	}
+    }
+  return default_assemble_integer (x, size, aligned_p);
+}
+
 /* Implement TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA.  */
 
 static bool
@@ -3174,6 +3268,29 @@ xtensa_output_addr_const_extra (FILE *fp, rtx x)
 	    {
 	      output_addr_const (fp, XVECEXP (x, 0, 0));
 	      fputs ("@PLT", fp);
+	      return true;
+	    }
+	  break;
+	case UNSPEC_GOT:
+	  if (flag_pic)
+	    {
+	      output_addr_const (fp, XVECEXP (x, 0, 0));
+	      x = XVECEXP (x, 0, 0);
+	      if (SYMBOL_REF_P (x) && (!SYMBOL_REF_LOCAL_P (x)
+				       || SYMBOL_REF_EXTERNAL_P (x)))
+		{
+		  if (SYMBOL_REF_FUNCTION_P (x))
+		    fputs ("@GOTFUNCDESC", fp);
+		  else
+		    fputs ("@GOT", fp);
+		}
+	      else
+		{
+		  if (SYMBOL_REF_FUNCTION_P (x))
+		    fputs ("@GOTOFFFUNCDESC", fp);
+		  else
+		    fputs ("@GOTOFF", fp);
+		}
 	      return true;
 	    }
 	  break;
@@ -5140,6 +5257,9 @@ xtensa_conditional_register_usage (void)
      the return address has been saved.  */
   if (!TARGET_WINDOWED_ABI)
     fixed_regs[A0_REG] = 0;
+
+  if (flag_pic && TARGET_FDPIC)
+    fixed_regs[PIC_OFFSET_TABLE_REGNUM] = 1;
 }
 
 /* Map hard register number to register class */
