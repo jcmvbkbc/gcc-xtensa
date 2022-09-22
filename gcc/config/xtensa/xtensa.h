@@ -76,6 +76,8 @@ along with GCC; see the file COPYING3.  If not see
     builtin_assert ("machine=xtensa");					\
     builtin_define ("__xtensa__");					\
     builtin_define ("__XTENSA__");					\
+    if (TARGET_FDPIC)							\
+      builtin_define ("__FDPIC__");					\
     builtin_define (TARGET_WINDOWED_ABI ?				\
 		    "__XTENSA_WINDOWED_ABI__" : "__XTENSA_CALL0_ABI__");\
     builtin_define (TARGET_BIG_ENDIAN ? "__XTENSA_EB__" : "__XTENSA_EL__"); \
@@ -526,11 +528,12 @@ typedef struct xtensa_args
 
 /* Size in bytes of the trampoline, as an integer.  Make sure this is
    a multiple of TRAMPOLINE_ALIGNMENT to avoid -Wpadded warnings.  */
-#define TRAMPOLINE_SIZE (TARGET_WINDOWED_ABI ? \
-			 (TARGET_CONST16 || TARGET_ABSOLUTE_LITERALS ? \
-			  60 : 52) : \
-			 (TARGET_CONST16 || TARGET_ABSOLUTE_LITERALS ? \
-			  32 : 24))
+#define TRAMPOLINE_SIZE (TARGET_WINDOWED_ABI \
+			 ? (TARGET_CONST16 || TARGET_ABSOLUTE_LITERALS ? \
+			    60 : 52) \
+			 : (TARGET_CONST16 || TARGET_ABSOLUTE_LITERALS \
+			    ? (TARGET_FDPIC ? 48 : 32) \
+			    : (TARGET_FDPIC ? 32 : 24)))
 
 /* Alignment required for trampolines, in bits.  */
 #define TRAMPOLINE_ALIGNMENT 32
@@ -606,14 +609,15 @@ typedef struct xtensa_args
     || GET_CODE (X) == CONST_INT || GET_CODE (X) == HIGH		\
     || (GET_CODE (X) == CONST)))
 
+#define PIC_OFFSET_TABLE_REGNUM 11
+
+#define PIC_OFFSET_TABLE_REG_CALL_CLOBBERED 1
+
 /* A C expression that is nonzero if X is a legitimate immediate
    operand on the target machine when generating position independent
    code.  */
 #define LEGITIMATE_PIC_OPERAND_P(X)					\
-  ((GET_CODE (X) != SYMBOL_REF						\
-    || (SYMBOL_REF_LOCAL_P (X) && !SYMBOL_REF_EXTERNAL_P (X)))		\
-   && GET_CODE (X) != LABEL_REF						\
-   && GET_CODE (X) != CONST)
+  xtensa_legitimate_pic_operand_p (X)
 
 /* Specify the machine mode that this machine uses
    for the index in the tablejump instruction.  */
@@ -747,10 +751,13 @@ typedef struct xtensa_args
 			       : DWARF_ALT_FRAME_RETURN_COLUMN + 1)
 #define EH_RETURN_DATA_REGNO(N) ((N) < 2 ? (N) + 2 : INVALID_REGNUM)
 #define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL)			\
-  (flag_pic								\
-   ? (((GLOBAL) ? DW_EH_PE_indirect : 0)				\
-      | DW_EH_PE_pcrel | DW_EH_PE_sdata4)				\
-   : DW_EH_PE_absptr)
+  (TARGET_FDPIC								\
+   ? ((GLOBAL) ? DW_EH_PE_indirect | DW_EH_PE_datarel : DW_EH_PE_pcrel)	\
+     | ((CODE) ? 0 : DW_EH_PE_sdata4)					\
+   : (flag_pic								\
+      ? (((GLOBAL) ? DW_EH_PE_indirect : 0)				\
+	 | DW_EH_PE_pcrel | DW_EH_PE_sdata4)				\
+      : DW_EH_PE_absptr))
 
 #define EH_RETURN_STACKADJ_RTX gen_rtx_REG (Pmode, GP_REG_FIRST + 10)
 
@@ -762,11 +769,49 @@ typedef struct xtensa_args
     fputs ("@pcrel", FILE);						\
   } while (0)
 
+/* Handle special EH pointer encodings.  Absolute, pc-relative, and
+   indirect are handled automatically.  */
+#define ASM_MAYBE_OUTPUT_ENCODED_ADDR_RTX(FILE, ENCODING, SIZE, ADDR, DONE) \
+  do { \
+    if (((ENCODING) & 0xf) != DW_EH_PE_sdata4 \
+	&& ((ENCODING) & 0xf) != DW_EH_PE_sdata8) \
+      { \
+	gcc_assert (GET_CODE (ADDR) == SYMBOL_REF); \
+	SYMBOL_REF_FLAGS (ADDR) |= SYMBOL_FLAG_FUNCTION; \
+	if (0) goto DONE; \
+      } \
+    if (TARGET_FDPIC \
+	&& ((ENCODING) & 0xf0) == (DW_EH_PE_indirect | DW_EH_PE_datarel)) \
+      { \
+	fputs ("\t.4byte ", FILE); \
+	output_addr_const (FILE, ADDR); \
+	if (GET_CODE (ADDR) == SYMBOL_REF && SYMBOL_REF_FUNCTION_P (ADDR)) \
+	  fputs ("@GOTFUNCDESC", FILE); \
+	else \
+	  fputs ("@GOT", FILE); \
+	goto DONE; \
+      } \
+  } while (0)
+
 /* Xtensa constant pool breaks the devices in crtstuff.c to control
    section in where code resides.  We have to write it as asm code.  Use
    a MOVI and let the assembler relax it -- for the .init and .fini
    sections, the assembler knows to put the literal in the right
    place.  */
+#ifdef __FDPIC__
+#if defined(__XTENSA_WINDOWED_ABI__)
+#error Unsupported ABI
+#elif defined(__XTENSA_CALL0_ABI__)
+#define CRT_CALL_STATIC_FUNCTION(SECTION_OP, FUNC) \
+    asm (SECTION_OP "\n\
+	movi\ta0, " USER_LABEL_PREFIX #FUNC "@GOTOFFFUNCDESC\n\
+	add\ta0, a0, a12\n\
+	l32i\ta0, a0, 0\n\
+	mov\ta11, a12\n\
+	callx0\ta0\n" \
+	TEXT_SECTION_ASM_OP);
+#endif
+#else
 #if defined(__XTENSA_WINDOWED_ABI__)
 #define CRT_CALL_STATIC_FUNCTION(SECTION_OP, FUNC) \
     asm (SECTION_OP "\n\
@@ -779,4 +824,5 @@ typedef struct xtensa_args
 	movi\ta0, " USER_LABEL_PREFIX #FUNC "\n\
 	callx0\ta0\n" \
 	TEXT_SECTION_ASM_OP);
+#endif
 #endif
