@@ -2419,15 +2419,30 @@ xtensa_call_tls_desc (rtx sym, rtx *retp)
   rtx_insn *call_insn, *insns;
 
   start_sequence ();
-  fn = gen_reg_rtx (Pmode);
   arg = gen_reg_rtx (Pmode);
   a_io = gen_rtx_REG (Pmode, WINDOW_SIZE + 2);
 
-  emit_insn (gen_tls_func (fn, sym));
+  if (TARGET_FDPIC)
+    {
+      rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
+      rtx tls_func_got_ptr = plus_constant (Pmode, initial_fdpic_reg, 4);
+
+      fn = xtensa_prepare_fdpic_call (gen_rtx_MEM (Pmode, tls_func_got_ptr));
+    }
+  else
+    {
+      fn = gen_reg_rtx (Pmode);
+      emit_insn (gen_tls_func (fn, sym));
+    }
   emit_insn (gen_tls_arg (arg, sym));
   emit_move_insn (a_io, arg);
   call_insn = emit_call_insn (gen_tls_call (a_io, fn, sym, const1_rtx));
   use_reg (&CALL_INSN_FUNCTION_USAGE (call_insn), a_io);
+  if (TARGET_FDPIC)
+    {
+      rtx fdpic_reg = gen_rtx_REG (Pmode, FDPIC_REG);
+      use_reg (&CALL_INSN_FUNCTION_USAGE (call_insn), fdpic_reg);
+    }
   insns = get_insns ();
   end_sequence ();
 
@@ -2465,6 +2480,14 @@ xtensa_legitimize_tls_address (rtx x)
       tp = gen_reg_rtx (SImode);
       emit_insn (gen_get_thread_pointersi (tp));
       addend = force_reg (SImode, gen_sym_TPOFF (x));
+      if (TARGET_FDPIC)
+	{
+	  rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
+	  rtx tmp = gen_reg_rtx (Pmode);
+
+	  emit_insn (gen_addsi3 (tmp, addend, initial_fdpic_reg));
+	  emit_move_insn (addend, gen_rtx_MEM (SImode, tmp));
+	}
       emit_insn (gen_addsi3 (dest, tp, addend));
       break;
 
@@ -3257,7 +3280,10 @@ xtensa_output_addr_const_extra (FILE *fp, rtx x)
 	{
 	case UNSPEC_TPOFF:
 	  output_addr_const (fp, XVECEXP (x, 0, 0));
-	  fputs ("@TPOFF", fp);
+	  if (TARGET_FDPIC)
+	    fputs ("@GOTTPOFF", fp);
+	  else
+	    fputs ("@TPOFF", fp);
 	  return true;
 	case UNSPEC_DTPOFF:
 	  output_addr_const (fp, XVECEXP (x, 0, 0));
