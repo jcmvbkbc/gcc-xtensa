@@ -634,7 +634,7 @@ xtensa_legitimate_pic_operand_p (rtx x)
 
   x = xtensa_delegitimize_address (x);
   x = strip_offset (x, &offset);
-  if (SYMBOL_REF_P (x))
+  if (SYMBOL_REF_P (x) || LABEL_REF_P (x))
     return false;
   return true;
 }
@@ -1212,6 +1212,163 @@ xtensa_constantsynth (rtx dst, HOST_WIDE_INT srcval)
   return 0;
 }
 
+/* Try to determine whether an object, referenced via ORIG, will be
+   placed in the text or data segment.  This is used in FDPIC mode, to
+   decide which relocations to use when accessing ORIG.  *IS_READONLY
+   is set to true if ORIG is a read-only location, false otherwise.
+   Return true if we could determine the location of ORIG, false
+   otherwise.  *IS_READONLY is valid only when we return true.  */
+static bool
+xtensa_is_segment_info_known (rtx orig, bool *is_readonly)
+{
+  *is_readonly = false;
+
+  if (LABEL_REF_P (orig))
+    {
+      *is_readonly = true;
+      return true;
+    }
+
+  if (SYMBOL_REF_P (orig))
+    {
+      if (CONSTANT_POOL_ADDRESS_P (orig))
+	{
+	  *is_readonly = true;
+	  return true;
+	}
+      if (SYMBOL_REF_LOCAL_P (orig)
+	  && !SYMBOL_REF_EXTERNAL_P (orig)
+	  && SYMBOL_REF_DECL (orig)
+	  && (!DECL_P (SYMBOL_REF_DECL (orig))
+	      || !DECL_COMMON (SYMBOL_REF_DECL (orig))))
+	{
+	  tree decl = SYMBOL_REF_DECL (orig);
+	  tree init = (TREE_CODE (decl) == VAR_DECL)
+	    ? DECL_INITIAL (decl) : (TREE_CODE (decl) == CONSTRUCTOR)
+	    ? decl : 0;
+	  int reloc = 0;
+	  bool named_section, readonly;
+
+	  if (init && init != error_mark_node)
+	    reloc = compute_reloc_for_constant (init);
+
+	  named_section = TREE_CODE (decl) == VAR_DECL
+	    && lookup_attribute ("section", DECL_ATTRIBUTES (decl));
+	  readonly = decl_readonly_section (decl, reloc);
+
+	  /* We don't know where the link script will put a named
+	     section, so return false in such a case.  */
+	  if (named_section)
+	    return false;
+
+	  *is_readonly = readonly;
+	  return true;
+	}
+
+      /* We don't know.  */
+      return false;
+    }
+
+  gcc_unreachable ();
+}
+
+/* Generate code to load the address of a static var under FDPIC.  */
+static rtx_insn *
+xtensa_pic_static_addr (rtx dst, rtx src)
+{
+  rtx_insn *insn;
+  rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
+  rtx tmp1 = can_create_pseudo_p () ? gen_reg_rtx (Pmode) : dst;
+  rtx tmp2 = can_create_pseudo_p () ? gen_reg_rtx (Pmode) : dst;
+  bool local = LABEL_REF_P (src) || SYMBOL_REF_LOCAL_P (src);
+
+  fprintf(stderr, "%s, ", __func__);
+  print_rtl_single (stderr, src);
+
+  if (SYMBOL_REF_P (src) && CONSTANT_POOL_ADDRESS_P (src))
+    {
+      emit_move_insn (tmp1, gen_rtx_MEM (Pmode, initial_fdpic_reg));
+      insn = emit_insn (gen_addsi3 (dst, tmp1, src));
+    }
+  else
+    {
+      bool is_readonly;
+      bool segment_info_known = xtensa_is_segment_info_known (src, &is_readonly);
+
+      fprintf(stderr, "local = %d, segment_info_known = %d, is_readonly = %d\n",
+	      local, segment_info_known, segment_info_known ? is_readonly : false);
+      if (segment_info_known && is_readonly && tmp1 != tmp2 && false /* doesn't work yet */)
+	{
+	  emit_move_insn (tmp1, src);
+	  emit_move_insn (tmp2, gen_rtx_MEM (Pmode, initial_fdpic_reg));
+	  insn = emit_insn (gen_addsi3 (dst, tmp1, tmp2));
+	}
+      else
+	{
+	  src = gen_sym_GOT (src);
+	  emit_move_insn (tmp1, src);
+	  emit_insn (gen_addsi3 (tmp2, tmp1, initial_fdpic_reg));
+	  if (!local || !segment_info_known || is_readonly)
+	    insn = emit_move_insn (dst, gen_rtx_MEM (Pmode, tmp2));
+	  else
+	    insn = emit_move_insn (dst, tmp2);
+	}
+    }
+  return insn;
+}
+
+static rtx
+legitimize_pic_address (rtx orig, rtx reg)
+{
+  if (!reg)
+    {
+      gcc_assert (can_create_pseudo_p ());
+      reg = gen_reg_rtx (Pmode);
+    }
+
+  if (SYMBOL_REF_P (orig) || LABEL_REF_P (orig))
+    {
+      rtx_insn *insn;
+
+#if 0
+      if (LABEL_REF_P (orig)
+	  || (SYMBOL_REF_P (orig)
+	      && SYMBOL_REF_LOCAL_P (orig)
+	      && (!SYMBOL_REF_DECL (orig)
+		  || !DECL_WEAK (SYMBOL_REF_DECL (orig)))
+	      && !SYMBOL_REF_FUNCTION_P (orig)))
+#endif
+	if (1)
+	insn = xtensa_pic_static_addr (reg, orig);
+      else
+	{
+	  gcc_unreachable ();
+	}
+
+      // optimization breaks the resulting code
+      //set_unique_reg_note (insn, REG_EQUAL, orig);
+      fprintf(stderr, "REG_EQUAL ");
+      print_rtl_single (stderr, orig);
+      return reg;
+    }
+  else if (GET_CODE (orig) == CONST)
+    {
+      rtx base, offset;
+
+      gcc_assert (GET_CODE (XEXP (orig, 0)) == PLUS);
+
+      base = legitimize_pic_address (XEXP (XEXP (orig, 0), 0), reg);
+      offset = legitimize_pic_address (XEXP (XEXP (orig, 0), 1),
+				       reg == base ? NULL : reg);
+
+      if (CONST_INT_P (offset))
+	return plus_constant (Pmode, base, INTVAL (offset));
+
+      return gen_rtx_PLUS (Pmode, base, offset);
+    }
+
+  return orig;
+}
 
 /* Emit insns to move operands[1] into operands[0].
    Return 1 if we have written out everything that needs to be done to
@@ -1247,22 +1404,15 @@ xtensa_emit_move_sequence (rtx *operands, machine_mode mode)
 	  emit_move_insn (dst, src);
 	  return 1;
 	}
-      else if (TARGET_FDPIC && SYMBOL_REF_P (src))
+      else if (TARGET_FDPIC && !xtensa_legitimate_pic_operand_p (src))
 	{
-	  rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
-	  rtx tmp1 = can_create_pseudo_p () ? gen_reg_rtx (mode) : dst;
-	  rtx tmp2 = can_create_pseudo_p () ? gen_reg_rtx (mode) : dst;
-	  bool local = SYMBOL_REF_LOCAL_P (src);
-
-	  src = gen_sym_GOT (src);
-	  emit_move_insn (tmp1, src);
-	  emit_insn (gen_addsi3 (tmp2, tmp1, initial_fdpic_reg));
-	  if (!local)
-	    emit_move_insn (dst, gen_rtx_MEM (Pmode, tmp2));
-	  else
-	    emit_move_insn (dst, tmp2);
+	  rtx tmp = legitimize_pic_address (src, can_create_pseudo_p () ? NULL : dst);
+	  emit_move_insn (dst, tmp);
 	  return 1;
 	}
+      fprintf(stderr, "not an fdpic symbol ref, ");
+      print_rtl_single (stderr, src);
+      fprintf(stderr, "\n");
 
       if (! TARGET_AUTO_LITPOOLS && ! TARGET_CONST16
 	  && ! (CONST_INT_P (src) && can_create_pseudo_p ()))
@@ -3302,8 +3452,7 @@ xtensa_output_addr_const_extra (FILE *fp, rtx x)
 	    {
 	      output_addr_const (fp, XVECEXP (x, 0, 0));
 	      x = XVECEXP (x, 0, 0);
-	      if (SYMBOL_REF_P (x) && (!SYMBOL_REF_LOCAL_P (x)
-				       || SYMBOL_REF_EXTERNAL_P (x)))
+	      if (SYMBOL_REF_P (x) && (!SYMBOL_REF_LOCAL_P (x)))
 		{
 		  if (SYMBOL_REF_FUNCTION_P (x))
 		    fputs ("@GOTFUNCDESC", fp);
@@ -3312,10 +3461,15 @@ xtensa_output_addr_const_extra (FILE *fp, rtx x)
 		}
 	      else
 		{
-		  if (SYMBOL_REF_FUNCTION_P (x))
+		  bool is_readonly;
+
+		  if (SYMBOL_REF_P (x) && SYMBOL_REF_FUNCTION_P (x))
 		    fputs ("@GOTOFFFUNCDESC", fp);
-		  else
+		  else if (xtensa_is_segment_info_known (x, &is_readonly)
+			   && !is_readonly)
 		    fputs ("@GOTOFF", fp);
+		  else
+		    fputs ("@GOT", fp);
 		}
 	      return true;
 	    }
