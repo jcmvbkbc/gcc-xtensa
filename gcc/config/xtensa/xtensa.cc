@@ -1282,8 +1282,8 @@ xtensa_pic_static_addr (rtx dst, rtx src)
   rtx tmp2 = can_create_pseudo_p () ? gen_reg_rtx (Pmode) : dst;
   bool local = LABEL_REF_P (src) || SYMBOL_REF_LOCAL_P (src);
 
-  fprintf(stderr, "%s, ", __func__);
-  print_rtl_single (stderr, src);
+  //fprintf(stderr, "%s, ", __func__);
+  //print_rtl_single (stderr, src);
 
   if (SYMBOL_REF_P (src) && CONSTANT_POOL_ADDRESS_P (src))
     {
@@ -1295,8 +1295,8 @@ xtensa_pic_static_addr (rtx dst, rtx src)
       bool is_readonly;
       bool segment_info_known = xtensa_is_segment_info_known (src, &is_readonly);
 
-      fprintf(stderr, "local = %d, segment_info_known = %d, is_readonly = %d\n",
-	      local, segment_info_known, segment_info_known ? is_readonly : false);
+      //fprintf(stderr, "local = %d, segment_info_known = %d, is_readonly = %d\n",
+	//      local, segment_info_known, segment_info_known ? is_readonly : false);
       if (segment_info_known && is_readonly && tmp1 != tmp2 && false /* doesn't work yet */)
 	{
 	  emit_move_insn (tmp1, src);
@@ -1347,8 +1347,8 @@ legitimize_pic_address (rtx orig, rtx reg)
 
       // optimization breaks the resulting code
       //set_unique_reg_note (insn, REG_EQUAL, orig);
-      fprintf(stderr, "REG_EQUAL ");
-      print_rtl_single (stderr, orig);
+      //fprintf(stderr, "REG_EQUAL ");
+      //print_rtl_single (stderr, orig);
       return reg;
     }
   else if (GET_CODE (orig) == CONST)
@@ -1410,9 +1410,9 @@ xtensa_emit_move_sequence (rtx *operands, machine_mode mode)
 	  emit_move_insn (dst, tmp);
 	  return 1;
 	}
-      fprintf(stderr, "not an fdpic symbol ref, ");
-      print_rtl_single (stderr, src);
-      fprintf(stderr, "\n");
+      //fprintf(stderr, "not an fdpic symbol ref, ");
+      //print_rtl_single (stderr, src);
+      //fprintf(stderr, "\n");
 
       if (! TARGET_AUTO_LITPOOLS && ! TARGET_CONST16
 	  && ! (CONST_INT_P (src) && can_create_pseudo_p ()))
