@@ -1361,8 +1361,12 @@ legitimize_pic_address (rtx orig, rtx reg)
       offset = legitimize_pic_address (XEXP (XEXP (orig, 0), 1),
 				       reg == base ? NULL : reg);
 
-      if (CONST_INT_P (offset))
+      if (CONST_INT_P (offset)
+	  && (xtensa_simm8 (INTVAL (offset))
+	      || xtensa_simm8x256 (INTVAL (offset))))
 	return plus_constant (Pmode, base, INTVAL (offset));
+      else
+	offset = force_reg (SImode, offset);
 
       return gen_rtx_PLUS (Pmode, base, offset);
     }
