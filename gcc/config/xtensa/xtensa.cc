@@ -1280,12 +1280,11 @@ xtensa_pic_static_addr (rtx dst, rtx src)
   rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
   rtx tmp1 = can_create_pseudo_p () ? gen_reg_rtx (Pmode) : dst;
   rtx tmp2 = can_create_pseudo_p () ? gen_reg_rtx (Pmode) : dst;
-  bool local = LABEL_REF_P (src) || SYMBOL_REF_LOCAL_P (src);
 
   //fprintf(stderr, "%s, ", __func__);
   //print_rtl_single (stderr, src);
 
-  if (SYMBOL_REF_P (src) && CONSTANT_POOL_ADDRESS_P (src))
+  if (SYMBOL_REF_P (src) && CONSTANT_POOL_ADDRESS_P (src) && false /* doesn't work yet */)
     {
       emit_move_insn (tmp1, gen_rtx_MEM (Pmode, initial_fdpic_reg));
       insn = emit_insn (gen_addsi3 (dst, tmp1, src));
@@ -1305,10 +1304,15 @@ xtensa_pic_static_addr (rtx dst, rtx src)
 	}
       else
 	{
-	  src = gen_sym_GOT (src);
-	  emit_move_insn (tmp1, src);
+	  rtx got_src = gen_sym_GOT (src);
+
+	  emit_move_insn (tmp1, got_src);
 	  emit_insn (gen_addsi3 (tmp2, tmp1, initial_fdpic_reg));
-	  if (!local || !segment_info_known || is_readonly)
+	  if (LABEL_REF_P (src)
+	      || (SYMBOL_REF_FUNCTION_P (src) && !SYMBOL_REF_LOCAL_P (src))
+	      || (!SYMBOL_REF_FUNCTION_P (src)
+		  && (!SYMBOL_REF_LOCAL_P (src)
+		      || !segment_info_known || is_readonly)))
 	    insn = emit_move_insn (dst, gen_rtx_MEM (Pmode, tmp2));
 	  else
 	    insn = emit_move_insn (dst, tmp2);
