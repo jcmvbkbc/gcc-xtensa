@@ -630,12 +630,16 @@ xtensa_tls_symbol_p (rtx x)
 bool
 xtensa_legitimate_pic_operand_p (rtx x)
 {
-  poly_int64 offset;
+  rtx orig = x;
 
-  x = xtensa_delegitimize_address (x);
-  x = strip_offset (x, &offset);
-  if (SYMBOL_REF_P (x) || LABEL_REF_P (x))
-    return false;
+  if (SYMBOL_REF_P (x) || LABEL_REF_P (x)
+      || (GET_CODE (x) == CONST
+	  && GET_CODE (XEXP (x, 0)) == PLUS
+	  && GET_CODE (XEXP (XEXP (x, 0), 0)) == SYMBOL_REF))
+    return 0;
+
+  fprintf (stderr, "%s: ", __func__);
+  print_rtl_single (stderr, orig);
   return true;
 }
 
@@ -5640,6 +5644,8 @@ xtensa_delegitimize_address (rtx op)
 
     case UNSPEC:
       if (XINT (op, 1) == UNSPEC_PLT)
+	return XVECEXP(op, 0, 0);
+      if (XINT (op, 1) == UNSPEC_GOT)
 	return XVECEXP(op, 0, 0);
       break;
 
