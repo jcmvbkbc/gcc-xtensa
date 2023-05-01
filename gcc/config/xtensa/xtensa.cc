@@ -1313,13 +1313,7 @@ xtensa_pic_static_addr (rtx dst, rtx src)
 	      || (!SYMBOL_REF_FUNCTION_P (src)
 		  && (!SYMBOL_REF_LOCAL_P (src)
 		      || !segment_info_known || is_readonly)))
-	    {
-	      rtx got = gen_rtx_MEM (Pmode, tmp2);
-
-	      MEM_READONLY_P (got) = 1;
-	      MEM_NOTRAP_P (got) = 1;
-	      insn = emit_move_insn (dst, got);
-	    }
+	    insn = emit_move_insn (dst, gen_rtx_MEM (Pmode, tmp2));
 	  else
 	    insn = emit_move_insn (dst, tmp2);
 	}
@@ -2394,7 +2388,6 @@ xtensa_prepare_fdpic_call (rtx addr)
 {
   rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
   rtx fdpic_reg = gen_rtx_REG (Pmode, FDPIC_REG);
-  rtx fn_val;
   rtx reg;
   bool symbol = SYMBOL_REF_P (addr);
   bool local = symbol && SYMBOL_REF_LOCAL_P (addr);
@@ -2408,32 +2401,15 @@ xtensa_prepare_fdpic_call (rtx addr)
     {
       emit_insn (gen_addsi3 (reg, reg, initial_fdpic_reg));
       if (!local)
-	{
-	  rtx got = gen_rtx_MEM (Pmode, reg);
-
-	  MEM_READONLY_P (got) = 1;
-	  MEM_NOTRAP_P (got) = 1;
-	  emit_move_insn (reg, got);
-	}
+	emit_move_insn (reg, gen_rtx_MEM (Pmode, reg));
     }
 
   if (local)
-    {
-      emit_move_insn (fdpic_reg, initial_fdpic_reg);
-    }
+    emit_move_insn (fdpic_reg, initial_fdpic_reg);
   else
-    {
-      rtx fdpic_val = gen_rtx_MEM (Pmode, plus_constant (Pmode, reg, 4));
-
-      MEM_READONLY_P (fdpic_val) = 1;
-      MEM_NOTRAP_P (fdpic_val) = 1;
-      emit_move_insn (fdpic_reg, fdpic_val);
-    }
-
-  fn_val = gen_rtx_MEM (Pmode, reg);
-  MEM_READONLY_P (fn_val) = 1;
-  MEM_NOTRAP_P (fn_val) = 1;
-  emit_move_insn (reg, fn_val);
+    emit_move_insn (fdpic_reg,
+		    gen_rtx_MEM (Pmode, plus_constant (Pmode, reg, 4)));
+  emit_move_insn (reg, gen_rtx_MEM (Pmode, reg));
   return reg;
 }
 
