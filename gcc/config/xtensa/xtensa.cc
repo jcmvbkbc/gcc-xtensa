@@ -1231,7 +1231,7 @@ xtensa_is_segment_info_known (rtx orig, bool *is_readonly)
 
   if (SYMBOL_REF_P (orig))
     {
-      if (CONSTANT_POOL_ADDRESS_P (orig))
+      if (CONSTANT_POOL_ADDRESS_P (orig) || SYMBOL_REF_FUNCTION_P (orig))
 	{
 	  *is_readonly = true;
 	  return true;
@@ -1304,7 +1304,8 @@ xtensa_pic_static_addr (rtx dst, rtx src)
 	}
       else
 	{
-	  rtx got_src = gen_sym_GOT (src);
+	  rtx got_src = SYMBOL_REF_P (src) && SYMBOL_REF_FUNCTION_P (src)
+	    ? gen_sym_GOT_FUNCDESC (src) : gen_sym_GOT (src);
 
 	  emit_move_insn (tmp1, got_src);
 	  emit_insn (gen_addsi3 (tmp2, tmp1, initial_fdpic_reg));
@@ -2393,7 +2394,7 @@ xtensa_prepare_fdpic_call (rtx addr)
   bool local = symbol && SYMBOL_REF_LOCAL_P (addr);
 
   if (symbol)
-    addr = gen_sym_GOT (addr);
+    addr = local ? gen_sym_GOT (addr) : gen_sym_GOT_FUNCDESC (addr);
 
   reg = xtensa_make_indirect_call_reg (addr);
 
@@ -3462,23 +3463,30 @@ xtensa_output_addr_const_extra (FILE *fp, rtx x)
 	      x = XVECEXP (x, 0, 0);
 	      if (SYMBOL_REF_P (x) && (!SYMBOL_REF_LOCAL_P (x)))
 		{
-		  if (SYMBOL_REF_FUNCTION_P (x))
-		    fputs ("@GOTFUNCDESC", fp);
-		  else
-		    fputs ("@GOT", fp);
+		  fputs ("@GOT", fp);
 		}
 	      else
 		{
 		  bool is_readonly;
 
-		  if (SYMBOL_REF_P (x) && SYMBOL_REF_FUNCTION_P (x))
-		    fputs ("@GOTOFFFUNCDESC", fp);
-		  else if (xtensa_is_segment_info_known (x, &is_readonly)
-			   && !is_readonly)
+		  if (xtensa_is_segment_info_known (x, &is_readonly)
+		      && !is_readonly)
 		    fputs ("@GOTOFF", fp);
 		  else
 		    fputs ("@GOT", fp);
 		}
+	      return true;
+	    }
+	  break;
+	case UNSPEC_GOT_FUNCDESC:
+	  if (flag_pic)
+	    {
+	      output_addr_const (fp, XVECEXP (x, 0, 0));
+	      x = XVECEXP (x, 0, 0);
+	      if (SYMBOL_REF_LOCAL_P (x))
+		fputs ("@GOTOFFFUNCDESC", fp);
+	      else
+		fputs ("@GOTFUNCDESC", fp);
 	      return true;
 	    }
 	  break;

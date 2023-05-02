@@ -43,6 +43,7 @@
   UNSPEC_LSETUP_END
   UNSPEC_FRAME_BLOCKAGE
   UNSPEC_GOT
+  UNSPEC_GOT_FUNCDESC
 ])
 
 (define_c_enum "unspecv" [
@@ -2369,6 +2370,11 @@
 
 (define_expand "sym_GOT"
   [(const (unspec [(match_operand:SI 0 "" "")] UNSPEC_GOT))]
+  ""
+  "")
+
+(define_expand "sym_GOT_FUNCDESC"
+  [(const (unspec [(match_operand:SI 0 "" "")] UNSPEC_GOT_FUNCDESC))]
   ""
   "")
 
