@@ -1489,6 +1489,7 @@ xtensa*-*-elf*)
 xtensa*-*-linux*)
 	tmake_file="$tmake_file xtensa/t-xtensa xtensa/t-linux t-slibgcc-libgcc"
 	md_unwind_header=xtensa/linux-unwind.h
+	unwind_header=config/xtensa/unwind-xtensa.h
 	;;
 xtensa*-*-uclinux*)
 	tmake_file="$tmake_file xtensa/t-xtensa xtensa/t-linux t-slibgcc-libgcc"
