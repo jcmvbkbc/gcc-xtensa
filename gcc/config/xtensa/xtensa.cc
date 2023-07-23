@@ -2891,6 +2891,19 @@ xtensa_match_CLAMPS_imms_p (rtx cst_max, rtx cst_min)
 static bool
 xtensa_cannot_force_const_mem (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 {
+  rtx base, offset;
+  split_const (x, &base, &offset);
+
+#if 0
+  if (dump_file)
+    {
+      fprintf(dump_file, "%s, ", __func__);
+      print_rtl_single (dump_file, x);
+    }
+#endif
+
+  if (TARGET_FDPIC && SYMBOL_REF_P (base))
+    return true;
   return xtensa_tls_referenced_p (x);
 }
 
