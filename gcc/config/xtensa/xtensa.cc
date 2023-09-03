@@ -1318,6 +1318,18 @@ xtensa_is_segment_info_known (rtx orig, bool *is_readonly)
   gcc_unreachable ();
 }
 
+static rtx_insn *
+xtensa_fdpic_load_static_addr_ro (rtx dst, rtx src, rtx initial_fdpic_reg,
+				  rtx tmp1, rtx tmp2)
+{
+  gcc_assert (tmp1 != tmp2);
+
+  emit_move_insn (tmp1, gen_sym_LITERAL (src));
+  emit_move_insn (tmp2,
+		  gen_rtx_MEM (Pmode, plus_constant (Pmode, initial_fdpic_reg, 12)));
+  return emit_insn (gen_addsi3 (dst, tmp1, tmp2));
+}
+
 /* Generate code to load the address of a static var under FDPIC.  */
 static rtx_insn *
 xtensa_pic_static_addr (rtx dst, rtx src)
@@ -1326,44 +1338,34 @@ xtensa_pic_static_addr (rtx dst, rtx src)
   rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
   rtx tmp1 = can_create_pseudo_p () ? gen_reg_rtx (Pmode) : dst;
   rtx tmp2 = can_create_pseudo_p () ? gen_reg_rtx (Pmode) : dst;
+  bool is_readonly;
+  bool segment_info_known = xtensa_is_segment_info_known (src, &is_readonly);
 
   //fprintf(stderr, "%s, ", __func__);
   //print_rtl_single (stderr, src);
 
-  if (SYMBOL_REF_P (src) && CONSTANT_POOL_ADDRESS_P (src) && false /* doesn't work yet */)
+  //fprintf(stderr, "local = %d, segment_info_known = %d, is_readonly = %d\n",
+  //      local, segment_info_known, segment_info_known ? is_readonly : false);
+  if (segment_info_known && is_readonly && tmp1 != tmp2
+      && (!SYMBOL_REF_P (src) || !SYMBOL_REF_FUNCTION_P (src)))
     {
-      emit_move_insn (tmp1, gen_rtx_MEM (Pmode, initial_fdpic_reg));
-      insn = emit_insn (gen_addsi3 (dst, tmp1, src));
+      insn = xtensa_fdpic_load_static_addr_ro (dst, src, initial_fdpic_reg, tmp1, tmp2);
     }
   else
     {
-      bool is_readonly;
-      bool segment_info_known = xtensa_is_segment_info_known (src, &is_readonly);
+      rtx got_src = SYMBOL_REF_P (src) && SYMBOL_REF_FUNCTION_P (src)
+	? gen_sym_GOT_FUNCDESC (src) : gen_sym_GOT (src);
 
-      //fprintf(stderr, "local = %d, segment_info_known = %d, is_readonly = %d\n",
-	//      local, segment_info_known, segment_info_known ? is_readonly : false);
-      if (segment_info_known && is_readonly && tmp1 != tmp2 && false /* doesn't work yet */)
-	{
-	  emit_move_insn (tmp1, src);
-	  emit_move_insn (tmp2, gen_rtx_MEM (Pmode, initial_fdpic_reg));
-	  insn = emit_insn (gen_addsi3 (dst, tmp1, tmp2));
-	}
+      emit_move_insn (tmp1, got_src);
+      emit_insn (gen_addsi3 (tmp2, tmp1, initial_fdpic_reg));
+      if (LABEL_REF_P (src)
+	  || (SYMBOL_REF_FUNCTION_P (src) && !SYMBOL_REF_LOCAL_P (src))
+	  || (!SYMBOL_REF_FUNCTION_P (src)
+	      && (!SYMBOL_REF_LOCAL_P (src)
+		  || !segment_info_known || is_readonly)))
+	insn = emit_move_insn (dst, gen_rtx_MEM (Pmode, tmp2));
       else
-	{
-	  rtx got_src = SYMBOL_REF_P (src) && SYMBOL_REF_FUNCTION_P (src)
-	    ? gen_sym_GOT_FUNCDESC (src) : gen_sym_GOT (src);
-
-	  emit_move_insn (tmp1, got_src);
-	  emit_insn (gen_addsi3 (tmp2, tmp1, initial_fdpic_reg));
-	  if (LABEL_REF_P (src)
-	      || (SYMBOL_REF_FUNCTION_P (src) && !SYMBOL_REF_LOCAL_P (src))
-	      || (!SYMBOL_REF_FUNCTION_P (src)
-		  && (!SYMBOL_REF_LOCAL_P (src)
-		      || !segment_info_known || is_readonly)))
-	    insn = emit_move_insn (dst, gen_rtx_MEM (Pmode, tmp2));
-	  else
-	    insn = emit_move_insn (dst, tmp2);
-	}
+	insn = emit_move_insn (dst, tmp2);
     }
   return insn;
 }
@@ -2459,24 +2461,38 @@ xtensa_prepare_fdpic_call (rtx addr)
   bool symbol = SYMBOL_REF_P (addr);
   bool local = symbol && SYMBOL_REF_LOCAL_P (addr);
 
-  if (symbol)
-    addr = local ? gen_sym_GOT (addr) : gen_sym_GOT_FUNCDESC (addr);
-
-  reg = xtensa_make_indirect_call_reg (addr);
-
-  if (symbol)
-    {
-      emit_insn (gen_addsi3 (reg, reg, initial_fdpic_reg));
-      if (!local)
-	emit_move_insn (reg, gen_rtx_MEM (Pmode, reg));
-    }
-
   if (local)
-    emit_move_insn (fdpic_reg, initial_fdpic_reg);
+    {
+      rtx tmp;
+
+      if (can_create_pseudo_p ())
+	{
+	  reg = gen_reg_rtx (Pmode);
+	  tmp = gen_reg_rtx (Pmode);
+	}
+      else
+	{
+	  reg = gen_rtx_REG (Pmode, A8_REG);
+	  tmp = gen_rtx_REG (Pmode, A9_REG);
+	}
+
+      xtensa_fdpic_load_static_addr_ro (reg, addr, initial_fdpic_reg, reg, tmp);
+      emit_move_insn (fdpic_reg, initial_fdpic_reg);
+    }
   else
-    emit_move_insn (fdpic_reg,
-		    gen_rtx_MEM (Pmode, plus_constant (Pmode, reg, 4)));
-  emit_move_insn (reg, gen_rtx_MEM (Pmode, reg));
+    {
+      if (symbol)
+	addr = gen_sym_GOT_FUNCDESC (addr);
+      reg = xtensa_make_indirect_call_reg (addr);
+      if (symbol)
+	{
+	  emit_insn (gen_addsi3 (reg, reg, initial_fdpic_reg));
+	  emit_move_insn (reg, gen_rtx_MEM (Pmode, reg));
+	}
+      emit_move_insn (fdpic_reg,
+		      gen_rtx_MEM (Pmode, plus_constant (Pmode, reg, 4)));
+      emit_move_insn (reg, gen_rtx_MEM (Pmode, reg));
+    }
   return reg;
 }
 
@@ -3611,6 +3627,13 @@ xtensa_output_addr_const_extra (FILE *fp, rtx x)
 		fputs ("@GOTOFFFUNCDESC", fp);
 	      else
 		fputs ("@GOTFUNCDESC", fp);
+	      return true;
+	    }
+	  break;
+	case UNSPEC_LITERAL:
+	  if (flag_pic)
+	    {
+	      output_addr_const (fp, XVECEXP (x, 0, 0));
 	      return true;
 	    }
 	  break;
