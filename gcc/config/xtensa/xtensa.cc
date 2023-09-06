@@ -2453,13 +2453,25 @@ xtensa_make_indirect_call_reg (rtx addr)
 }
 
 static rtx
-xtensa_prepare_fdpic_call (rtx addr)
+xtensa_prepare_fdpic_call (rtx addr, bool sibcall)
 {
-  rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
-  rtx fdpic_reg = gen_rtx_REG (Pmode, FDPIC_REG);
   rtx reg;
   bool symbol = SYMBOL_REF_P (addr);
   bool local = symbol && SYMBOL_REF_LOCAL_P (addr);
+  rtx fdpic_reg = gen_rtx_REG (Pmode, FDPIC_REG);
+  rtx initial_fdpic_reg;
+
+  if (can_create_pseudo_p ())
+    {
+      initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
+    }
+  else
+    {
+      /* It should only happen in the MI thunk and thus the call must be
+	 a sibcall and FDPIC register must hold its initial value.  */
+      gcc_assert (sibcall);
+      initial_fdpic_reg = fdpic_reg;
+    }
 
   if (local)
     {
@@ -2498,7 +2510,7 @@ xtensa_prepare_fdpic_call (rtx addr)
 
 
 void
-xtensa_expand_call (int callop, rtx *operands)
+xtensa_expand_call (int callop, rtx *operands, bool sibcall)
 {
   rtx call;
   rtx_insn *call_insn;
@@ -2506,7 +2518,7 @@ xtensa_expand_call (int callop, rtx *operands)
 
   if (TARGET_FDPIC)
     {
-      XEXP (operands[callop], 0) = xtensa_prepare_fdpic_call (addr);
+      XEXP (operands[callop], 0) = xtensa_prepare_fdpic_call (addr, sibcall);
     }
   else
     {
@@ -2669,7 +2681,7 @@ xtensa_call_tls_desc (rtx sym, rtx *retp)
       rtx initial_fdpic_reg = get_hard_reg_initial_val (Pmode, FDPIC_REG);
       rtx tls_func_got_ptr = plus_constant (Pmode, initial_fdpic_reg, 4);
 
-      fn = xtensa_prepare_fdpic_call (gen_rtx_MEM (Pmode, tls_func_got_ptr));
+      fn = xtensa_prepare_fdpic_call (gen_rtx_MEM (Pmode, tls_func_got_ptr), false);
     }
   else
     {
