@@ -1290,6 +1290,9 @@ case "${target}" in
   loongarch*-*-*)
     noconfigdirs="$noconfigdirs gprof"
     ;;
+  xtensa*-*-*fdpic)
+    noconfigdirs="$noconfigdirs target-libbacktrace target-libgomp"
+    ;;
 esac
 
 # If we aren't building newlib, then don't build libgloss, since libgloss
