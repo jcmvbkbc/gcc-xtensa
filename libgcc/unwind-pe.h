@@ -264,10 +264,10 @@ read_encoded_value_with_base (unsigned char encoding, _Unwind_Ptr base,
 
       if (result != 0)
 	{
-#if __FDPIC__
+#if defined (__FDPIC__) && defined (__arm__)
 	  /* FDPIC relative addresses imply taking the GOT address
 	     into account.  */
-	  if ((encoding & DW_EH_PE_pcrel) && (encoding & DW_EH_PE_indirect))
+	  if ((encoding & 0x70) == DW_EH_PE_pcrel && (encoding & DW_EH_PE_indirect))
 	    {
 	      result += _Unwind_gnu_Find_got ((_Unwind_Ptr) u);
 	      result = *(_Unwind_Internal_Ptr *) result;
