@@ -5205,6 +5205,10 @@ xtensa_asm_trampoline_template (FILE *stream)
     }
   else
     {
+      if (TARGET_FDPIC)
+	fprintf (stream, "%s0\n%s0\n",
+		 integer_asm_op (4, TRUE),
+		 integer_asm_op (4, TRUE));
       if (use_call0)
 	{
 	  /* Save the return address.  */
@@ -5215,7 +5219,7 @@ xtensa_asm_trampoline_template (FILE *stream)
 	     the constants without relying on L32R.  */
 	  fprintf (stream, "\tcall0\t.Lskipconsts\n");
 	}
-      else
+      else if (!TARGET_FDPIC)
 	fprintf (stream, "\tj\t.Lskipconsts\n");
 
       fprintf (stream, "\t.align\t4\n");
@@ -5236,13 +5240,18 @@ xtensa_asm_trampoline_template (FILE *stream)
 	  fprintf (stream, "\tl32r\ta8, .Lchainval\n");
 	  fprintf (stream, "\tl32r\ta9, .Lfnaddr\n");
 	}
+      if (TARGET_FDPIC)
+	{
+	  fprintf (stream, "\tl32i\ta11, a9, 4\n");
+	  fprintf (stream, "\tl32i\ta9, a9, 0\n");
+	}
       fprintf (stream, "\tjx\ta9\n");
 
       /* Pad size to a multiple of TRAMPOLINE_ALIGNMENT.  */
       if (use_call0)
 	fprintf (stream, "\t.byte\t0\n");
       else
-	fprintf (stream, "\tnop\n");
+	fprintf (stream, "\t.byte\t%s\n", TARGET_FDPIC ? "0" : "0, 0, 0");
     }
   fprintf (stream, "\t.end no-transform\n");
 }
@@ -5255,6 +5264,9 @@ xtensa_trampoline_init (rtx m_tramp, tree fndecl, rtx chain)
   int chain_off;
   int func_off;
 
+  emit_block_move (m_tramp, assemble_trampoline_template (),
+		   GEN_INT (TRAMPOLINE_SIZE), BLOCK_OP_NORMAL);
+
   if (TARGET_WINDOWED_ABI)
     {
       chain_off = use_call0 ? 12 : 8;
@@ -5266,8 +5278,18 @@ xtensa_trampoline_init (rtx m_tramp, tree fndecl, rtx chain)
       func_off = use_call0 ? 12 : 8;
     }
 
-  emit_block_move (m_tramp, assemble_trampoline_template (),
-		   GEN_INT (TRAMPOLINE_SIZE), BLOCK_OP_NORMAL);
+  if (TARGET_FDPIC)
+    {
+      rtx a = force_reg (Pmode, plus_constant (Pmode, XEXP (m_tramp, 0),
+					       use_call0 ? 8 : 16));
+
+      emit_move_insn (adjust_address (m_tramp, SImode, 0), a);
+      emit_move_insn (adjust_address (m_tramp, SImode, 4),
+		      get_hard_reg_initial_val (Pmode, FDPIC_REG));
+
+      chain_off = use_call0 ? 16 : 8;
+      func_off = use_call0 ? 20 : 12;
+    }
 
   emit_move_insn (adjust_address (m_tramp, SImode, chain_off), chain);
   emit_move_insn (adjust_address (m_tramp, SImode, func_off), func);
