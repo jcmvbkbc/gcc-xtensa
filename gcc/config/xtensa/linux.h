@@ -52,6 +52,10 @@ along with GCC; see the file COPYING3.  If not see
 
 #define GLIBC_DYNAMIC_LINKER "/lib/ld.so.1"
 
+#undef MUSL_DYNAMIC_LINKER
+#define MUSL_DYNAMIC_LINKER \
+  "/lib/ld-musl-xtensa" "%{mfdpic:-fdpic}.so.1"
+
 #undef LINK_SPEC
 #define LINK_SPEC \
  "%{shared:-shared} \
@@ -64,9 +68,11 @@ along with GCC; see the file COPYING3.  If not see
   %{mabi=windowed:--abi-windowed} \
   %{mabi=call0:--abi-call0}"
 
+#if 0
 #undef	STARTFILE_SPEC
 #define STARTFILE_SPEC "%{mfdpic:%{!shared:crtreloc.o%s}} " \
   GNU_USER_TARGET_STARTFILE_SPEC
+#endif
 
 #undef LOCAL_LABEL_PREFIX
 #define LOCAL_LABEL_PREFIX	"."
