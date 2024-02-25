@@ -46,11 +46,23 @@ along with GCC; see the file COPYING3.  If not see
   %{mauto-litpools:--auto-litpools} \
   %{mno-auto-litpools:--no-auto-litpools} \
   %{mabi=windowed:--abi-windowed} \
-  %{mabi=call0:--abi-call0} \
-  %{mfdpic:--fdpic} \
+  %{mabi=call0:--abi-call0} " TARGET_FDPIC_ASM_SPEC
+
+#define TARGET_FDPIC_ASM_SPEC \
+ "%{mfdpic:--fdpic} \
   %{mno-fdpic:--no-fdpic}"
 
+
 #define GLIBC_DYNAMIC_LINKER "/lib/ld.so.1"
+
+#undef MUSL_DYNAMIC_LINKER
+#define MUSL_DYNAMIC_LINKER \
+  "/lib/ld-musl-xtensa%{mfdpic:-fdpic}.so.1"
+
+#undef	CC1_SPEC
+#define CC1_SPEC GNU_USER_TARGET_CC1_SPEC TARGET_FDPIC_CC1_SPEC
+
+#define TARGET_FDPIC_CC1_SPEC ""
 
 #undef LINK_SPEC
 #define LINK_SPEC \
@@ -62,11 +74,11 @@ along with GCC; see the file COPYING3.  If not see
     %{static-pie:-static -pie --no-dynamic-linker -z text} \
     %{static:-static}} \
   %{mabi=windowed:--abi-windowed} \
-  %{mabi=call0:--abi-call0}"
+  %{mabi=call0:--abi-call0} " TARGET_FDPIC_LINKER_EMULATION
 
-#undef	STARTFILE_SPEC
-#define STARTFILE_SPEC "%{mfdpic:%{!shared:crtreloc.o%s}} " \
-  GNU_USER_TARGET_STARTFILE_SPEC
+#define TARGET_FDPIC_LINKER_EMULATION \
+ "%{mfdpic:-m elf32xtensa_fdpic} \
+  %{mno-fdpic:-m elf32xtensa}"
 
 #undef LOCAL_LABEL_PREFIX
 #define LOCAL_LABEL_PREFIX	"."
