@@ -3402,13 +3402,8 @@
 	* unwind-pe.h (read_encoded_value_with_base): Likewise.
 
 2019-09-10  Christophe Lyon  <christophe.lyon@st.com>
-	Mickaël Guêné <mickael.guene@st.com>
 
-	* libgcc/crtstuff.c: Add support for FDPIC.
-
-2019-09-10  Christophe Lyon  <christophe.lyon@st.com>
-
-	* config.host: Handle *-*-uclinuxfdpiceabi.
+        * config.host: Handle *-*-uclinuxfdpiceabi.
 
 2019-09-09  Jose E. Marchesi  <jose.marchesi@oracle.com>
 
