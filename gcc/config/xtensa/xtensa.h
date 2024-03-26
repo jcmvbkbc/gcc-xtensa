@@ -248,13 +248,38 @@ along with GCC; see the file COPYING3.  If not see
 
 #define REG_ALLOC_ORDER							\
 {									\
-   8,  9, 10, 11, 12, 13, 14, 15,  7,  6,  5,  4,  3,  2,		\
+  /*  a8 ... a15 : no special usage */					\
+   8,  9, 10, 11, 12, 13, 14, 15,					\
+  /*  a7 ...  a2 : incoming arguments, in reverse order */		\
+   7,  6,  5,  4,  3,  2,						\
+  /*  b0	 : boolean register for floating-point CC */		\
   18,									\
+  /*  f0 ... f15 : floating-point registers */				\
   19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,	\
-   0,  1, 16, 17,							\
+  /*  a0	 : return address */					\
+   0,									\
+  /*  sp	 : stack pointer */					\
+   1,									\
+  /*  fp	 : FRAME_POINTER (fake) */				\
+  16,									\
+  /* argp	 : ARG_POINTER (fake) */				\
+  17,									\
+  /* acc	 : MAC16 accumulator */					\
   35,									\
 }
 #define ADJUST_REG_ALLOC_ORDER xtensa_adjust_reg_alloc_order ()
+
+/* For Xtensa, the only point of this is to prevent GCC from otherwise
+   giving preference to call-used registers.  To minimize window
+   overflows for the AR registers, we want to give preference to the
+   lower-numbered AR registers.  For other register files, which are
+   not windowed, we still prefer call-used registers, if there are any.  */
+extern const char xtensa_leaf_regs[FIRST_PSEUDO_REGISTER];
+#define LEAF_REGISTERS xtensa_leaf_regs
+
+/* For Xtensa, no remapping is necessary, but this macro must be
+   defined if LEAF_REGISTERS is defined.  */
+#define LEAF_REG_REMAP(REGNO) ((int) (REGNO))
 
 /* Internal macros to classify a register number.  */
 

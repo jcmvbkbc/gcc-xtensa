@@ -110,6 +110,18 @@ struct GTY(()) machine_function
   HARD_REG_SET eliminated_callee_saved;
 };
 
+/* Vector, indexed by hard register number, which contains 1 for a
+   register that is allowable in a candidate for leaf function
+   treatment.  */
+
+const char xtensa_leaf_regs[FIRST_PSEUDO_REGISTER] =
+{
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+  1
+};
+
 static void xtensa_option_override (void);
 static enum internal_test map_test_to_internal_test (enum rtx_code);
 static rtx gen_int_relational (enum rtx_code, rtx, rtx);
@@ -4314,15 +4326,32 @@ void
 xtensa_adjust_reg_alloc_order (void)
 {
   static const int reg_windowed_alloc_order[FIRST_PSEUDO_REGISTER] =
-	REG_ALLOC_ORDER;
+    REG_ALLOC_ORDER;
   static const int reg_call0_alloc_order[FIRST_PSEUDO_REGISTER] =
-  {
-     9, 10, 11,  7,  6,  5,  4,  3,  2,  8,  0, 12, 13, 14, 15,
-    18,
-    19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-     1, 16, 17,
-    35,
-  };
+    {
+      /*  a9 ... a11 : no special usage */
+       9, 10, 11,
+      /*  a7 ...  a2 : function arguments, in reverse order */
+       7,  6,  5,  4,  3,  2,
+      /*  a8	     : static chain */
+       8,
+      /*  a0	     : return address (also callee saved) */
+       0,
+      /* a12 ... a15 : callee saved */
+      12, 13, 14, 15,
+      /*  b0	     : boolean register for floating-point CC */
+      18,
+      /*  f0 ... f15 : floating-point registers */
+      19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
+      /*  sp	     : stack pointer */
+       1,
+      /*  fp	     : FRAME_POINTER (fake) */
+      16,
+      /* argp	     : ARG_POINTER (fake) */
+      17,
+      /* acc	     : MAC16 accumulator */
+      35,
+    };
 
   memcpy (reg_alloc_order, TARGET_WINDOWED_ABI ?
 	  reg_windowed_alloc_order : reg_call0_alloc_order,
