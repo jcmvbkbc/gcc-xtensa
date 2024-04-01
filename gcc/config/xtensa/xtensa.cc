@@ -1340,9 +1340,8 @@ xtensa_fdpic_load_static_addr_ro (rtx dst, rtx src, rtx initial_fdpic_reg,
 {
   gcc_assert (tmp1 != tmp2);
 
-  emit_move_insn (tmp1, gen_sym_LITERAL (src));
-  emit_move_insn (tmp2,
-		  gen_rtx_MEM (Pmode, plus_constant (Pmode, initial_fdpic_reg, 12)));
+  emit_move_insn (tmp1, gen_sym_SECREL (src));
+  emit_insn(gen_load_gotsecbase (tmp2, initial_fdpic_reg, src));
   return emit_insn (gen_addsi3 (dst, tmp1, tmp2));
 }
 
@@ -3569,10 +3568,11 @@ xtensa_output_addr_const_extra (FILE *fp, rtx x)
 	      return true;
 	    }
 	  break;
-	case UNSPEC_LITERAL:
+	case UNSPEC_SECREL:
 	  if (flag_pic)
 	    {
 	      output_addr_const (fp, XVECEXP (x, 0, 0));
+	      fputs ("@SECREL", fp);
 	      return true;
 	    }
 	  break;

@@ -50,7 +50,8 @@
   UNSPEC_FRAME_BLOCKAGE
   UNSPEC_GOT
   UNSPEC_GOT_FUNCDESC
-  UNSPEC_LITERAL
+  UNSPEC_SECREL
+  UNSPEC_GOT_SECBASE
 ])
 
 (define_c_enum "unspecv" [
@@ -1317,6 +1318,16 @@
   [(set_attr "type"	"move,move,move,load,store,load,store,store,move,move,move,move,move,load,rsr,wsr")
    (set_attr "mode"	"SI")
    (set_attr "length"	"2,2,2,3,3,2,2,2,3,3,3,3,6,3,3,3")])
+
+(define_insn "load_gotsecbase"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(unspec:SI [(match_operand:SI 1 "register_operand" "r")
+		    (match_operand:SI 2 "" "")] UNSPEC_GOT_SECBASE))]
+  ""
+  ".reloc\t., R_XTENSA_GOTSECBASE, %2\;l32i\t%0, %1, 0"
+  [(set_attr "type"	"load")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
 
 (define_split
   [(set (match_operand:SHI 0 "register_operand")
@@ -2637,8 +2648,8 @@
   ""
   "")
 
-(define_expand "sym_LITERAL"
-  [(const (unspec [(match_operand:SI 0 "" "")] UNSPEC_LITERAL))]
+(define_expand "sym_SECREL"
+  [(const (unspec [(match_operand:SI 0 "" "")] UNSPEC_SECREL))]
   ""
   "")
 
