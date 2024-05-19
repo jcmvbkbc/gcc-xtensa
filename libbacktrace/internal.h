@@ -323,10 +323,22 @@ struct dwarf_sections
 
 struct dwarf_data;
 
+#if defined (HAVE_DL_ITERATE_PHDR) && defined (__FDPIC__)
+typedef struct elf32_fdpic_loadaddr base_address_type;
+#define __RELOC_UINTPTR(ptr, base) ((uintptr_t)__RELOC_POINTER (ptr, base))
+#define no_base_address ((struct elf32_fdpic_loadaddr){0})
+#else
+typedef uintptr_t base_address_type;
+#define __RELOC_POINTER(ptr, base) ((ptr) + (base))
+#define __RELOC_UINTPTR(ptr, base) ((uintptr_t)__RELOC_POINTER (ptr, base))
+#define no_base_address ((uintptr_t)0)
+#endif
+
+
 /* Add file/line information for a DWARF module.  */
 
 extern int backtrace_dwarf_add (struct backtrace_state *state,
-				uintptr_t base_address,
+				base_address_type base_address,
 				const struct dwarf_sections *dwarf_sections,
 				int is_bigendian,
 				struct dwarf_data *fileline_altlink,

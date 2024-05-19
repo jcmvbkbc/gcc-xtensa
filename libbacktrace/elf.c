@@ -633,7 +633,7 @@ elf_symbol_search (const void *vkey, const void *ventry)
 
 static int
 elf_initialize_syminfo (struct backtrace_state *state,
-			uintptr_t base_address,
+			base_address_type base_address,
 			const unsigned char *symtab_data, size_t symtab_size,
 			const unsigned char *strtab, size_t strtab_size,
 			backtrace_error_callback error_callback,
@@ -699,7 +699,7 @@ elf_initialize_syminfo (struct backtrace_state *state,
 	  = *(const b_elf_addr *) (opd->data + (sym->st_value - opd->addr));
       else
 	elf_symbols[j].address = sym->st_value;
-      elf_symbols[j].address += base_address;
+      elf_symbols[j].address = __RELOC_UINTPTR (elf_symbols[j].address, base_address);
       elf_symbols[j].size = sym->st_size;
       ++j;
     }
@@ -6506,7 +6506,7 @@ backtrace_uncompress_lzma (struct backtrace_state *state,
 static int
 elf_add (struct backtrace_state *state, const char *filename, int descriptor,
 	 const unsigned char *memory, size_t memory_size,
-	 uintptr_t base_address, struct elf_ppc64_opd_data *caller_opd,
+	 base_address_type base_address, struct elf_ppc64_opd_data *caller_opd,
 	 backtrace_error_callback error_callback, void *data,
 	 fileline *fileline_fn, int *found_sym, int *found_dwarf,
 	 struct dwarf_data **fileline_entry, int exe, int debuginfo,
@@ -6636,9 +6636,15 @@ elf_add (struct backtrace_state *state, const char *filename, int descriptor,
 
   /* If the executable is ET_DYN, it is either a PIE, or we are running
      directly a shared library with .interp.  We need to wait for
-     dl_iterate_phdr in that case to determine the actual base_address.  */
+     dl_iterate_phdr in that case to determine the actual base_address.
+     In case of FDPIC we always need the actual base_address.  */
+#ifndef __FDPIC__
   if (exe && ehdr.e_type == ET_DYN)
     return -1;
+#else
+  if (exe)
+    return -1;
+#endif
 
   shoff = ehdr.e_shoff;
   shnum = ehdr.e_shnum;
@@ -7413,9 +7419,9 @@ backtrace_initialize (struct backtrace_state *state, const char *filename,
   fileline elf_fileline_fn = elf_nodebug;
   struct phdr_data pd;
 
-  ret = elf_add (state, filename, descriptor, NULL, 0, 0, NULL, error_callback,
-		 data, &elf_fileline_fn, &found_sym, &found_dwarf, NULL, 1, 0,
-		 NULL, 0);
+  ret = elf_add (state, filename, descriptor, NULL, 0, no_base_address, NULL,
+		 error_callback, data, &elf_fileline_fn, &found_sym,
+		 &found_dwarf, NULL, 1, 0, NULL, 0);
   if (!ret)
     return 0;
 
