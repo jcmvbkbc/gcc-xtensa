@@ -786,6 +786,13 @@ NEON_FUNCTION (vaddq, gimple_expr, (PLUS_EXPR, PLUS_EXPR, BIT_XOR_EXPR))
 NEON_FUNCTION (vqaddb, vqaddh, vqadds, vqaddd, vqadd, vqaddq, gimple_ifn, (IFN_SAT_ADD))
 NEON_FUNCTION (vqsubb, vqsubh, vqsubs, vqsubd, vqsub, vqsubq, gimple_ifn, (IFN_SAT_SUB))
 
+// Reductions
+NEON_FUNCTION (vaddv,   vaddvq,   gimple_ifn, (IFN_REDUC_PLUS))
+NEON_FUNCTION (vmaxv,   vmaxvq,   gimple_ifn, (IFN_REDUC_MAX))
+NEON_FUNCTION (vminv,   vminvq,   gimple_ifn, (IFN_REDUC_MIN))
+NEON_FUNCTION (vmaxnmv, vmaxnmvq, gimple_ifn, (IFN_REDUC_FMAX))
+NEON_FUNCTION (vminnmv, vminnmvq, gimple_ifn, (IFN_REDUC_FMIN))
+
 // Bitwise operations
 NEON_FUNCTION (vand,  vandq,  gimple_expr,    (BIT_AND_EXPR))
 NEON_FUNCTION (vbic,  vbicq,  gimple_not_rhs, (BIT_AND_EXPR))
