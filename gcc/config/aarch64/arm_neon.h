@@ -11448,51 +11448,6 @@ vmax_f64 (float64x1_t __a, float64x1_t __b)
 				      vget_lane_f64 (__b, 0)) };
 }
 
-__extension__ extern __inline int8x8_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmax_s8 (int8x8_t __a, int8x8_t __b)
-{
-  return __builtin_aarch64_smaxv8qi (__a, __b);
-}
-
-__extension__ extern __inline int16x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmax_s16 (int16x4_t __a, int16x4_t __b)
-{
-  return __builtin_aarch64_smaxv4hi (__a, __b);
-}
-
-__extension__ extern __inline int32x2_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmax_s32 (int32x2_t __a, int32x2_t __b)
-{
-  return __builtin_aarch64_smaxv2si (__a, __b);
-}
-
-__extension__ extern __inline uint8x8_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmax_u8 (uint8x8_t __a, uint8x8_t __b)
-{
-  return (uint8x8_t) __builtin_aarch64_umaxv8qi ((int8x8_t) __a,
-						 (int8x8_t) __b);
-}
-
-__extension__ extern __inline uint16x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmax_u16 (uint16x4_t __a, uint16x4_t __b)
-{
-  return (uint16x4_t) __builtin_aarch64_umaxv4hi ((int16x4_t) __a,
-						  (int16x4_t) __b);
-}
-
-__extension__ extern __inline uint32x2_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmax_u32 (uint32x2_t __a, uint32x2_t __b)
-{
-  return (uint32x2_t) __builtin_aarch64_umaxv2si ((int32x2_t) __a,
-						  (int32x2_t) __b);
-}
-
 __extension__ extern __inline float32x4_t
 __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
 vmaxq_f32 (float32x4_t __a, float32x4_t __b)
@@ -11507,50 +11462,6 @@ vmaxq_f64 (float64x2_t __a, float64x2_t __b)
   return __builtin_aarch64_fmax_nanv2df (__a, __b);
 }
 
-__extension__ extern __inline int8x16_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmaxq_s8 (int8x16_t __a, int8x16_t __b)
-{
-  return __builtin_aarch64_smaxv16qi (__a, __b);
-}
-
-__extension__ extern __inline int16x8_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmaxq_s16 (int16x8_t __a, int16x8_t __b)
-{
-  return __builtin_aarch64_smaxv8hi (__a, __b);
-}
-
-__extension__ extern __inline int32x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmaxq_s32 (int32x4_t __a, int32x4_t __b)
-{
-  return __builtin_aarch64_smaxv4si (__a, __b);
-}
-
-__extension__ extern __inline uint8x16_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmaxq_u8 (uint8x16_t __a, uint8x16_t __b)
-{
-  return (uint8x16_t) __builtin_aarch64_umaxv16qi ((int8x16_t) __a,
-						   (int8x16_t) __b);
-}
-
-__extension__ extern __inline uint16x8_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmaxq_u16 (uint16x8_t __a, uint16x8_t __b)
-{
-  return (uint16x8_t) __builtin_aarch64_umaxv8hi ((int16x8_t) __a,
-						  (int16x8_t) __b);
-}
-
-__extension__ extern __inline uint32x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmaxq_u32 (uint32x4_t __a, uint32x4_t __b)
-{
-  return (uint32x4_t) __builtin_aarch64_umaxv4si ((int32x4_t) __a,
-						  (int32x4_t) __b);
-}
 /* vmulx */
 
 __extension__ extern __inline float32x2_t
@@ -12007,38 +11918,6 @@ vpminnms_f32 (float32x2_t __a)
   return __builtin_aarch64_reduc_smin_scal_v2sf (__a);
 }
 
-/* vmaxnm  */
-
-__extension__ extern __inline float32x2_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmaxnm_f32 (float32x2_t __a, float32x2_t __b)
-{
-  return __builtin_aarch64_fmaxv2sf (__a, __b);
-}
-
-__extension__ extern __inline float64x1_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmaxnm_f64 (float64x1_t __a, float64x1_t __b)
-{
-  return (float64x1_t)
-    { __builtin_aarch64_fmaxdf (vget_lane_f64 (__a, 0),
-				vget_lane_f64 (__b, 0)) };
-}
-
-__extension__ extern __inline float32x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmaxnmq_f32 (float32x4_t __a, float32x4_t __b)
-{
-  return __builtin_aarch64_fmaxv4sf (__a, __b);
-}
-
-__extension__ extern __inline float64x2_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmaxnmq_f64 (float64x2_t __a, float64x2_t __b)
-{
-  return __builtin_aarch64_fmaxv2df (__a, __b);
-}
-
 /* vmaxv  */
 
 __extension__ extern __inline float32_t
@@ -12080,51 +11959,6 @@ vmin_f64 (float64x1_t __a, float64x1_t __b)
 					  vget_lane_f64 (__b, 0)) };
 }
 
-__extension__ extern __inline int8x8_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmin_s8 (int8x8_t __a, int8x8_t __b)
-{
-  return __builtin_aarch64_sminv8qi (__a, __b);
-}
-
-__extension__ extern __inline int16x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmin_s16 (int16x4_t __a, int16x4_t __b)
-{
-  return __builtin_aarch64_sminv4hi (__a, __b);
-}
-
-__extension__ extern __inline int32x2_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmin_s32 (int32x2_t __a, int32x2_t __b)
-{
-  return __builtin_aarch64_sminv2si (__a, __b);
-}
-
-__extension__ extern __inline uint8x8_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmin_u8 (uint8x8_t __a, uint8x8_t __b)
-{
-  return (uint8x8_t) __builtin_aarch64_uminv8qi ((int8x8_t) __a,
-						 (int8x8_t) __b);
-}
-
-__extension__ extern __inline uint16x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmin_u16 (uint16x4_t __a, uint16x4_t __b)
-{
-  return (uint16x4_t) __builtin_aarch64_uminv4hi ((int16x4_t) __a,
-						  (int16x4_t) __b);
-}
-
-__extension__ extern __inline uint32x2_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmin_u32 (uint32x2_t __a, uint32x2_t __b)
-{
-  return (uint32x2_t) __builtin_aarch64_uminv2si ((int32x2_t) __a,
-						  (int32x2_t) __b);
-}
-
 __extension__ extern __inline float32x4_t
 __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
 vminq_f32 (float32x4_t __a, float32x4_t __b)
@@ -12137,83 +11971,6 @@ __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
 vminq_f64 (float64x2_t __a, float64x2_t __b)
 {
   return __builtin_aarch64_fmin_nanv2df (__a, __b);
-}
-
-__extension__ extern __inline int8x16_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vminq_s8 (int8x16_t __a, int8x16_t __b)
-{
-  return __builtin_aarch64_sminv16qi (__a, __b);
-}
-
-__extension__ extern __inline int16x8_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vminq_s16 (int16x8_t __a, int16x8_t __b)
-{
-  return __builtin_aarch64_sminv8hi (__a, __b);
-}
-
-__extension__ extern __inline int32x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vminq_s32 (int32x4_t __a, int32x4_t __b)
-{
-  return __builtin_aarch64_sminv4si (__a, __b);
-}
-
-__extension__ extern __inline uint8x16_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vminq_u8 (uint8x16_t __a, uint8x16_t __b)
-{
-  return (uint8x16_t) __builtin_aarch64_uminv16qi ((int8x16_t) __a,
-						   (int8x16_t) __b);
-}
-
-__extension__ extern __inline uint16x8_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vminq_u16 (uint16x8_t __a, uint16x8_t __b)
-{
-  return (uint16x8_t) __builtin_aarch64_uminv8hi ((int16x8_t) __a,
-						  (int16x8_t) __b);
-}
-
-__extension__ extern __inline uint32x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vminq_u32 (uint32x4_t __a, uint32x4_t __b)
-{
-  return (uint32x4_t) __builtin_aarch64_uminv4si ((int32x4_t) __a,
-						  (int32x4_t) __b);
-}
-
-/* vminnm  */
-
-__extension__ extern __inline float32x2_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vminnm_f32 (float32x2_t __a, float32x2_t __b)
-{
-  return __builtin_aarch64_fminv2sf (__a, __b);
-}
-
-__extension__ extern __inline float64x1_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vminnm_f64 (float64x1_t __a, float64x1_t __b)
-{
-  return (float64x1_t)
-    { __builtin_aarch64_fmindf (vget_lane_f64 (__a, 0),
-				vget_lane_f64 (__b, 0)) };
-}
-
-__extension__ extern __inline float32x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vminnmq_f32 (float32x4_t __a, float32x4_t __b)
-{
-  return __builtin_aarch64_fminv4sf (__a, __b);
-}
-
-__extension__ extern __inline float64x2_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vminnmq_f64 (float64x2_t __a, float64x2_t __b)
-{
-  return __builtin_aarch64_fminv2df (__a, __b);
 }
 
 /* vminv  */
@@ -19066,20 +18823,6 @@ vmaxq_f16 (float16x8_t __a, float16x8_t __b)
 
 __extension__ extern __inline float16x4_t
 __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmaxnm_f16 (float16x4_t __a, float16x4_t __b)
-{
-  return __builtin_aarch64_fmaxv4hf (__a, __b);
-}
-
-__extension__ extern __inline float16x8_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vmaxnmq_f16 (float16x8_t __a, float16x8_t __b)
-{
-  return __builtin_aarch64_fmaxv8hf (__a, __b);
-}
-
-__extension__ extern __inline float16x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
 vmin_f16 (float16x4_t __a, float16x4_t __b)
 {
   return __builtin_aarch64_fmin_nanv4hf (__a, __b);
@@ -19090,20 +18833,6 @@ __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
 vminq_f16 (float16x8_t __a, float16x8_t __b)
 {
   return __builtin_aarch64_fmin_nanv8hf (__a, __b);
-}
-
-__extension__ extern __inline float16x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vminnm_f16 (float16x4_t __a, float16x4_t __b)
-{
-  return __builtin_aarch64_fminv4hf (__a, __b);
-}
-
-__extension__ extern __inline float16x8_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vminnmq_f16 (float16x8_t __a, float16x8_t __b)
-{
-  return __builtin_aarch64_fminv8hf (__a, __b);
 }
 
 __extension__ extern __inline float16x4_t
