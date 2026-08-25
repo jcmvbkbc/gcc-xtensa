@@ -800,6 +800,15 @@ NEON_FUNCTION (vrhadd, vrhaddq, gimple_ifn, (IFN_AVG_CEIL))
 // Square root
 NEON_FUNCTION (vsqrt, vsqrtq, gimple_ifn, (IFN_SQRT))
 
+// Rounding
+NEON_FUNCTION (vrnd,  vrndq,          gimple_ifn, (IFN_TRUNC))
+NEON_FUNCTION (vrnda, vrndaq,         gimple_ifn, (IFN_ROUND))
+NEON_FUNCTION (vrndi, vrndiq,         gimple_ifn, (IFN_NEARBYINT))
+NEON_FUNCTION (vrndm, vrndmq,         gimple_ifn, (IFN_FLOOR))
+NEON_FUNCTION (vrndn, vrndnq, vrndns, gimple_ifn, (IFN_ROUNDEVEN))
+NEON_FUNCTION (vrndp, vrndpq,         gimple_ifn, (IFN_CEIL))
+NEON_FUNCTION (vrndx, vrndxq,         gimple_ifn, (IFN_RINT))
+
 // Bitwise operations
 NEON_FUNCTION (vand,  vandq,  gimple_expr,    (BIT_AND_EXPR))
 NEON_FUNCTION (vbic,  vbicq,  gimple_not_rhs, (BIT_AND_EXPR))
