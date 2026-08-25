@@ -114,6 +114,14 @@ DEF_NEON_FUNCTION (vminnmv,  h_float, ("s0,D0"))
 DEF_NEON_FUNCTION (vminnmvq, h_float, ("s0,Q0"))
 #undef REQUIRED_EXTENSIONS
 
+// Halving add
+#define REQUIRED_EXTENSIONS nonstreaming_only (AARCH64_FL_SIMD)
+DEF_NEON_FUNCTION (vhadd,   bhs_integer, ("D0,D0,D0"))
+DEF_NEON_FUNCTION (vhaddq,  bhs_integer, ("Q0,Q0,Q0"))
+DEF_NEON_FUNCTION (vrhadd,  bhs_integer, ("D0,D0,D0"))
+DEF_NEON_FUNCTION (vrhaddq, bhs_integer, ("Q0,Q0,Q0"))
+#undef REQUIRED_EXTENSIONS
+
 // Bitwise operations
 #define REQUIRED_EXTENSIONS nonstreaming_only (AARCH64_FL_SIMD)
 DEF_NEON_FUNCTION (vand,   all_integer, ("D0,D0,D0"))
