@@ -16574,35 +16574,6 @@ vsqaddd_u64 (uint64_t __a, int64_t __b)
   return __builtin_aarch64_usqadddi_uus (__a, __b);
 }
 
-/* vsqrt */
-__extension__ extern __inline float32x2_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vsqrt_f32 (float32x2_t __a)
-{
-  return __builtin_aarch64_sqrtv2sf (__a);
-}
-
-__extension__ extern __inline float32x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vsqrtq_f32 (float32x4_t __a)
-{
-  return __builtin_aarch64_sqrtv4sf (__a);
-}
-
-__extension__ extern __inline float64x1_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vsqrt_f64 (float64x1_t __a)
-{
-  return (float64x1_t) { __builtin_aarch64_sqrtdf (__a[0]) };
-}
-
-__extension__ extern __inline float64x2_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vsqrtq_f64 (float64x2_t __a)
-{
-  return __builtin_aarch64_sqrtv2df (__a);
-}
-
 /* vsra */
 
 __extension__ extern __inline int8x8_t
@@ -19180,20 +19151,6 @@ __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
 vrsqrteq_f16 (float16x8_t __a)
 {
   return __builtin_aarch64_rsqrtev8hf (__a);
-}
-
-__extension__ extern __inline float16x4_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vsqrt_f16 (float16x4_t __a)
-{
-  return __builtin_aarch64_sqrtv4hf (__a);
-}
-
-__extension__ extern __inline float16x8_t
-__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
-vsqrtq_f16 (float16x8_t __a)
-{
-  return __builtin_aarch64_sqrtv8hf (__a);
 }
 
 /* ARMv8.2-A FP16 two operands vector intrinsics.  */

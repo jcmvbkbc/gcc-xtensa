@@ -797,6 +797,9 @@ NEON_FUNCTION (vminnmv, vminnmvq, gimple_ifn, (IFN_REDUC_FMIN))
 NEON_FUNCTION (vhadd,  vhaddq,  gimple_ifn, (IFN_AVG_FLOOR))
 NEON_FUNCTION (vrhadd, vrhaddq, gimple_ifn, (IFN_AVG_CEIL))
 
+// Square root
+NEON_FUNCTION (vsqrt, vsqrtq, gimple_ifn, (IFN_SQRT))
+
 // Bitwise operations
 NEON_FUNCTION (vand,  vandq,  gimple_expr,    (BIT_AND_EXPR))
 NEON_FUNCTION (vbic,  vbicq,  gimple_not_rhs, (BIT_AND_EXPR))
