@@ -854,25 +854,26 @@ gen_float_relational (enum rtx_code test_code, /* relational test (EQ, etc) */
   rtx (*gen_fn) (rtx, rtx, rtx);
   rtx brtmp;
   int reverse_regs, invert;
+  bool sf = GET_MODE (cmp0) == E_SFmode;
 
   switch (test_code)
     {
-    case EQ: reverse_regs = 0; invert = 0; gen_fn = gen_seq_sf; break;
-    case NE: reverse_regs = 0; invert = 1; gen_fn = gen_seq_sf; break;
-    case LE: reverse_regs = 0; invert = 0; gen_fn = gen_sle_sf; break;
-    case GT: reverse_regs = 1; invert = 0; gen_fn = gen_slt_sf; break;
-    case LT: reverse_regs = 0; invert = 0; gen_fn = gen_slt_sf; break;
-    case GE: reverse_regs = 1; invert = 0; gen_fn = gen_sle_sf; break;
-    case UNEQ: reverse_regs = 0; invert = 0; gen_fn = gen_suneq_sf; break;
-    case LTGT: reverse_regs = 0; invert = 1; gen_fn = gen_suneq_sf; break;
-    case UNLE: reverse_regs = 0; invert = 0; gen_fn = gen_sunle_sf; break;
-    case UNGT: reverse_regs = 1; invert = 0; gen_fn = gen_sunlt_sf; break;
-    case UNLT: reverse_regs = 0; invert = 0; gen_fn = gen_sunlt_sf; break;
-    case UNGE: reverse_regs = 1; invert = 0; gen_fn = gen_sunle_sf; break;
+    case EQ: reverse_regs = 0; invert = 0; gen_fn = sf ? gen_seq_sf : gen_seq_df; break;
+    case NE: reverse_regs = 0; invert = 1; gen_fn = sf ? gen_seq_sf : gen_seq_df; break;
+    case LE: reverse_regs = 0; invert = 0; gen_fn = sf ? gen_sle_sf : gen_sle_df; break;
+    case GT: reverse_regs = 1; invert = 0; gen_fn = sf ? gen_slt_sf : gen_slt_df; break;
+    case LT: reverse_regs = 0; invert = 0; gen_fn = sf ? gen_slt_sf : gen_slt_df; break;
+    case GE: reverse_regs = 1; invert = 0; gen_fn = sf ? gen_sle_sf : gen_sle_df; break;
+    case UNEQ: reverse_regs = 0; invert = 0; gen_fn = sf ? gen_suneq_sf : gen_suneq_df; break;
+    case LTGT: reverse_regs = 0; invert = 1; gen_fn = sf ? gen_suneq_sf : gen_suneq_df; break;
+    case UNLE: reverse_regs = 0; invert = 0; gen_fn = sf ? gen_sunle_sf : gen_sunle_df; break;
+    case UNGT: reverse_regs = 1; invert = 0; gen_fn = sf ? gen_sunlt_sf : gen_sunlt_df; break;
+    case UNLT: reverse_regs = 0; invert = 0; gen_fn = sf ? gen_sunlt_sf : gen_sunlt_df; break;
+    case UNGE: reverse_regs = 1; invert = 0; gen_fn = sf ? gen_sunle_sf : gen_sunle_df; break;
     case UNORDERED:
-      reverse_regs = 0; invert = 0; gen_fn = gen_sunordered_sf; break;
+      reverse_regs = 0; invert = 0; gen_fn = sf ? gen_sunordered_sf : gen_sunordered_df; break;
     case ORDERED:
-      reverse_regs = 0; invert = 1; gen_fn = gen_sunordered_sf; break;
+      reverse_regs = 0; invert = 1; gen_fn = sf ? gen_sunordered_sf : gen_sunordered_df; break;
     default:
       fatal_insn ("bad test", gen_rtx_fmt_ee (test_code, VOIDmode, cmp0, cmp1));
       reverse_regs = 0; invert = 0; gen_fn = 0; /* avoid compiler warnings */
@@ -899,6 +900,7 @@ xtensa_expand_conditional_branch (rtx *operands, machine_mode mode)
   switch (mode)
     {
     case E_SFmode:
+    case E_DFmode:
       if (TARGET_HARD_FLOAT)
 	{
 	  cmp = gen_float_relational (test_code, cmp0, cmp1);
@@ -906,7 +908,6 @@ xtensa_expand_conditional_branch (rtx *operands, machine_mode mode)
 	}
       /* FALLTHRU */
 
-    case E_DFmode:
     default:
       fatal_insn ("bad test", gen_rtx_fmt_ee (test_code, VOIDmode, cmp0, cmp1));
 
@@ -989,7 +990,8 @@ gen_conditional_move (enum rtx_code code, machine_mode mode,
       return gen_rtx_fmt_ee (code, VOIDmode, op0, op1);
     }
 
-  if (TARGET_HARD_FLOAT && mode == SFmode)
+  if (TARGET_HARD_FLOAT
+      && (mode == SFmode || mode == DFmode))
     return gen_float_relational (code, op0, op1);
 
   return 0;
@@ -997,7 +999,7 @@ gen_conditional_move (enum rtx_code code, machine_mode mode,
 
 
 int
-xtensa_expand_conditional_move (rtx *operands, int isflt)
+xtensa_expand_conditional_move (rtx *operands, machine_mode mode)
 {
   rtx dest = operands[0];
   rtx cmp = operands[1];
@@ -1008,14 +1010,29 @@ xtensa_expand_conditional_move (rtx *operands, int isflt)
 				    XEXP (cmp, 0), XEXP (cmp, 1))))
     return 0;
 
-  if (isflt)
-    gen_fn = (cmp_mode == SImode
-	      ? gen_movsfcc_internal0
-	      : gen_movsfcc_internal1);
-  else
-    gen_fn = (cmp_mode == SImode
-	      ? gen_movsicc_internal0
-	      : gen_movsicc_internal1);
+  switch (mode)
+    {
+    case E_SImode:
+      gen_fn = (cmp_mode == SImode
+		? gen_movsicc_internal0
+		: gen_movsicc_internal1);
+      break;
+
+    case E_SFmode:
+      gen_fn = (cmp_mode == SImode
+		? gen_movsfcc_internal0
+		: gen_movsfcc_internal1);
+      break;
+
+    case E_DFmode:
+      gen_fn = (cmp_mode == SImode
+		? gen_movdfcc_internal0
+		: gen_movdfcc_internal1);
+      break;
+
+    default:
+      gcc_unreachable ();
+    }
 
   emit_insn (gen_fn (dest, XEXP (cmp, 0), operands[2], operands[3], cmp));
   return 1;
@@ -1297,6 +1314,8 @@ xtensa_copy_incoming_a7 (rtx opnd)
   switch (mode)
     {
     case E_DFmode:
+      emit_insn (gen_movdf_internal (tmp, gen_raw_REG (mode, A7_REG - 1)));
+      break;
     case E_DImode:
       /* Copy the value out of A7 here but keep the first word in A6 until
 	 after the set_frame_ptr insn.  Otherwise, the register allocator
@@ -1304,6 +1323,8 @@ xtensa_copy_incoming_a7 (rtx opnd)
 	 value.  */
       emit_insn (gen_movsi_internal (gen_rtx_SUBREG (SImode, tmp, 4),
 				     gen_raw_REG (SImode, A7_REG)));
+      emit_insn (gen_movsi_internal (gen_rtx_SUBREG (SImode, tmp, 0),
+				     gen_rtx_REG (SImode, A7_REG - 1)));
       break;
     case E_SFmode:
       emit_insn (gen_movsf_internal (tmp, gen_raw_REG (mode, A7_REG)));
@@ -1323,10 +1344,6 @@ xtensa_copy_incoming_a7 (rtx opnd)
 
   cfun->machine->set_frame_ptr_insn = emit_insn (gen_set_frame_ptr ());
 
-  /* For DF and DI mode arguments, copy the incoming value in A6 now.  */
-  if (mode == DFmode || mode == DImode)
-    emit_insn (gen_movsi_internal (gen_rtx_SUBREG (SImode, tmp, 0),
-				   gen_rtx_REG (SImode, A7_REG - 1)));
   entry_insns = end_sequence ();
 
   if (cfun->machine->vararg_a7)
@@ -2100,6 +2117,8 @@ xtensa_emit_movcc (bool inverted, bool isfp, bool isbool, rtx *operands)
   static char result[64];
   enum rtx_code code;
   const char *op;
+  const char *dot_suffix = "";
+  int n;
 
   code = GET_CODE (operands[4]);
   if (inverted)
@@ -2124,9 +2143,26 @@ xtensa_emit_movcc (bool inverted, bool isfp, bool isbool, rtx *operands)
 	default:	gcc_unreachable ();
 	}
     }
+  if (isfp)
+    {
+      switch (GET_MODE (operands[0]))
+	{
+	case E_SFmode:	dot_suffix = ".s"; break;
+	case E_DFmode:	dot_suffix = ".s"; break; /* It should be .d, but this
+						     is supposed to be a macro
+						     and it's missing in the
+						     assembler. */
+	default:	gcc_unreachable ();
+	}
+    }
 
-  sprintf (result, "mov%s%s\t%%0, %%%d, %%1",
-	   op, isfp ? ".s" : "", inverted ? 3 : 2);
+  n = sprintf (result, "mov%s%s\t%%0, %%%d, %%1",
+	       op, dot_suffix, inverted ? 3 : 2);
+  if (!isfp && GET_MODE (operands[0]) == E_DFmode)
+    {
+      sprintf (result + n, " ; mov%s\t%%D0, %%D%d, %%1",
+	       op, inverted ? 3 : 2);
+    }
   return result;
 }
 
@@ -2997,7 +3033,7 @@ xtensa_option_override (void)
 	  else if (GP_REG_P (regno))
 	    temp = ((regno & 1) == 0 || (size <= UNITS_PER_WORD));
 	  else if (FP_REG_P (regno))
-	    temp = (TARGET_HARD_FLOAT && (mode == SFmode));
+	    temp = (TARGET_HARD_FLOAT && (mode == SFmode || mode == DFmode));
 	  else if (BR_REG_P (regno))
 	    temp = (TARGET_BOOLEANS && (mode == CCmode));
 	  else
@@ -3230,7 +3266,7 @@ print_operand (FILE *file, rtx x, int letter)
       break;
 
     case 'G':
-      if (CONST_DOUBLE_P (x) && GET_MODE (x) == SFmode)
+      if (CONST_DOUBLE_P (x) && (GET_MODE (x) == SFmode || GET_MODE (x) == DFmode))
 	fprintf (file, "%d", xtensa_fp_const (CONST_DOUBLE_REAL_VALUE (x)));
       else
 	output_operand_lossage ("invalid %%G value");
