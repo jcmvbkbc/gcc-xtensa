@@ -28467,6 +28467,73 @@ ix86_expand_sse2_mulvxdi3 (rtx op0, rtx op1, rtx op2)
 		       gen_rtx_MULT (mode, op1, op2));
 }
 
+void
+ix86_expand_umulvndi_highpart (rtx op0, rtx op1, rtx op2)
+{
+  /* The following sequence can be used with SSE2.  */
+  machine_mode mode = GET_MODE (op0);
+  rtx (*umul) (rtx, rtx, rtx);
+  machine_mode nmode;
+  if (mode == V2DImode)
+    {
+      umul = gen_vec_widen_umult_even_v4si;
+      nmode = V4SImode;
+    }
+  else if (mode == V4DImode)
+    {
+      umul = gen_vec_widen_umult_even_v8si;
+      nmode = V8SImode;
+    }
+  else if (mode == V8DImode)
+    {
+      umul = gen_vec_widen_umult_even_v16si;
+      nmode = V16SImode;
+    }
+  else
+    gcc_unreachable ();
+
+  rtx t32 = GEN_INT (32);
+
+  /* Shift input vectors right 32 bits so we can get high parts of operands.  */
+  rtx op1_hi = expand_binop (mode, lshr_optab, op1, t32, NULL, 1, OPTAB_DIRECT);
+  rtx op2_hi = expand_binop (mode, lshr_optab, op2, t32, NULL, 1, OPTAB_DIRECT);
+
+  /* Multiply low parts.  */
+  rtx p0 = gen_reg_rtx (mode);
+  emit_insn (umul (p0, gen_lowpart (nmode, op1), gen_lowpart (nmode, op2)));
+
+  /* Multiply high parts by low parts.  */
+  rtx p1 = gen_reg_rtx (mode);
+  emit_insn (umul (p1, gen_lowpart (nmode, op1_hi), gen_lowpart (nmode, op2)));
+  rtx p2 = gen_reg_rtx (mode);
+  emit_insn (umul (p2, gen_lowpart (nmode, op1), gen_lowpart (nmode, op2_hi)));
+
+  /* Multiply high parts.  */
+  rtx p3 = gen_reg_rtx (mode);
+  emit_insn (umul (p3, gen_lowpart (nmode, op1_hi),
+		   gen_lowpart (nmode, op2_hi)));
+
+  /* Fold the carry in once cross product at a time.
+     t = (p0 >> 32) + p1  */
+  rtx p0_hi = expand_binop (mode, lshr_optab, p0, t32, NULL, 1, OPTAB_DIRECT);
+  rtx t = expand_binop (mode, add_optab, p0_hi, p1, NULL, 1, OPTAB_DIRECT);
+
+  /* Extract low 32 bits of products by masking with 0xffffffff.  */
+  rtx mask = gen_reg_rtx (mode);
+  emit_insn (gen_rtx_SET (mask, CONSTM1_RTX (mode)));
+  mask = expand_binop (mode, lshr_optab, mask, t32, NULL, 1, OPTAB_DIRECT);
+
+  /* u = (t & MASK) + p2  */
+  rtx u = expand_binop (mode, and_optab, t, mask, NULL, 1, OPTAB_DIRECT);
+  u = expand_binop (mode, add_optab, u, p2, NULL, 1, OPTAB_DIRECT);
+
+  /* high = p3 + (t >> 32) + (u >> 32)  */
+  rtx t_hi = expand_binop (mode, lshr_optab, t, t32, NULL, 1, OPTAB_DIRECT);
+  rtx u_hi = expand_binop (mode, lshr_optab, u, t32, NULL, 1, OPTAB_DIRECT);
+  rtx high = expand_binop (mode, add_optab, p3, t_hi, NULL, 1, OPTAB_DIRECT);
+  force_expand_binop (mode, add_optab, high, u_hi, op0, 1, OPTAB_DIRECT);
+}
+
 /* Return 1 if control transfer instruction INSN
    should be encoded with notrack prefix.  */
 

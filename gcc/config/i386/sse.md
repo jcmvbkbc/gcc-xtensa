@@ -17404,6 +17404,17 @@
    (set_attr "prefix" "orig,vex")
    (set_attr "mode" "<sseinsnmode>")])
 
+(define_expand "umul<mode>3_highpart"
+  [(set (match_operand:VI8_AVX2_AVX512F 0 "register_operand")
+	(umul_highpart:VI8_AVX2_AVX512F
+	  (match_operand:VI8_AVX2_AVX512F 1 "vector_operand")
+	  (match_operand:VI8_AVX2_AVX512F 2 "vector_operand")))]
+  "TARGET_SSE2"
+{
+  ix86_expand_umulvndi_highpart (operands[0], operands[1], operands[2]);
+  DONE;
+})
+
 (define_expand "vec_widen_umult_even_v16si<mask_name>"
   [(set (match_operand:V8DI 0 "register_operand")
         (mult:V8DI
