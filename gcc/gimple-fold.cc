@@ -7623,6 +7623,9 @@ and_comparisons_1 (tree type, enum tree_code code1, tree op1a, tree op1b,
   /* Perhaps the first comparison is (NAME != 0) or (NAME == 1) where
      NAME's definition is a truth value.  See if there are any simplifications
      that can be done against the NAME's definition.  */
+  /* ???  Do the same for op2a, but as we are recursing we have to track
+     whether we swap the order of the comparsions since that's important
+     with respect to exceptions.  */
   if (TREE_CODE (op1a) == SSA_NAME
       && (code1 == NE_EXPR || code1 == EQ_EXPR)
       && (integer_zerop (op1b) || integer_onep (op1b)))
@@ -9311,10 +9314,6 @@ maybe_fold_and_comparisons (tree type,
 			    basic_block outer_cond_bb)
 {
   if (tree t = and_comparisons_1 (type, code1, op1a, op1b, code2, op2a, op2b,
-				  outer_cond_bb))
-    return t;
-
-  if (tree t = and_comparisons_1 (type, code2, op2a, op2b, code1, op1a, op1b,
 				  outer_cond_bb))
     return t;
 
