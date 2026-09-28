@@ -3085,7 +3085,9 @@ combine_comparisons (enum tree_code code, enum tree_code lcode,
 		     && (rcompcode != COMPCODE_ORD);
 	bool trap = (compcode & COMPCODE_UNORD) == 0
 		    && (compcode != COMPCODE_EQ)
-		    && (compcode != COMPCODE_ORD);
+		    && (compcode != COMPCODE_ORD)
+		    && (compcode != COMPCODE_FALSE)
+		    && (compcode != COMPCODE_TRUE);
 
         /* In a short-circuited boolean expression the LHS might be
 	   such that the RHS, if evaluated, will never trap.  For
