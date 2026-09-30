@@ -1216,6 +1216,24 @@
    (set_attr "mode"	"<MODE>")
    (set_attr "length"	"3")])
 
+(define_insn "extendsfdf2"
+  [(set (match_operand:DF 0 "register_operand" "=f")
+	(float_extend:DF (match_operand:SF 1 "register_operand" "f")))]
+  "TARGET_FLOAT64"
+  "cvtd.s\t%0, %1"
+  [(set_attr "type"	"fconv")
+   (set_attr "mode"	"DF")
+   (set_attr "length"	"3")])
+
+(define_insn "truncdfsf2"
+  [(set (match_operand:SF 0 "register_operand" "=f")
+	(float_truncate:SF (match_operand:DF 1 "register_operand" "f")))]
+  "TARGET_FLOAT64"
+  "cvts.d\t%0, %1"
+  [(set_attr "type"	"fconv")
+   (set_attr "mode"	"SF")
+   (set_attr "length"	"3")])
+
 
 ;; Data movement instructions.
 
