@@ -3263,14 +3263,14 @@ print_operand (FILE *file, rtx x, int letter)
       break;
 
     case 'U':
-      if (CONST_DOUBLE_P (x) && GET_MODE (x) == SFmode)
+      if (CONST_DOUBLE_P (x) && (GET_MODE (x) == SFmode || GET_MODE (x) == DFmode))
 	fprintf (file, "%d", REAL_EXP (CONST_DOUBLE_REAL_VALUE (x)) - 1);
       else
 	output_operand_lossage ("invalid %%U value");
       break;
 
     case 'V':
-      if (CONST_DOUBLE_P (x) && GET_MODE (x) == SFmode)
+      if (CONST_DOUBLE_P (x) && (GET_MODE (x) == SFmode || GET_MODE (x) == DFmode))
 	fprintf (file, "%d", 1 - REAL_EXP (CONST_DOUBLE_REAL_VALUE (x)));
       else
 	output_operand_lossage ("invalid %%V value");
