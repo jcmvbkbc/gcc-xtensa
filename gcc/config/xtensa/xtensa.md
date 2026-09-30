@@ -1447,7 +1447,7 @@
 			 (match_operand:SI 2 "fpmem_offset_operand" ""))))
    (set (match_dup 1)
 	(plus:SI (match_dup 1) (match_dup 2)))]
-  "TARGET_HARD_FLOAT && !TARGET_HARD_FLOAT_POSTINC"
+  "TARGET_FLOAT32 && !TARGET_HARD_FLOAT_POSTINC"
 {
   if (TARGET_SERIALIZE_VOLATILE && volatile_refs_p (PATTERN (insn)))
     output_asm_insn ("memw", operands);
@@ -1463,7 +1463,7 @@
 	(match_operand:SF 2 "register_operand" "f"))
    (set (match_dup 0)
 	(plus:SI (match_dup 0) (match_dup 1)))]
-  "TARGET_HARD_FLOAT && !TARGET_HARD_FLOAT_POSTINC"
+  "TARGET_FLOAT32 && !TARGET_HARD_FLOAT_POSTINC"
 {
   if (TARGET_SERIALIZE_VOLATILE && volatile_refs_p (PATTERN (insn)))
     output_asm_insn ("memw", operands);

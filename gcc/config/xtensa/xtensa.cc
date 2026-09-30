@@ -903,8 +903,15 @@ xtensa_expand_conditional_branch (rtx *operands, machine_mode mode)
   switch (mode)
     {
     case E_SFmode:
+      if (TARGET_FLOAT32)
+	{
+	  cmp = gen_float_relational (test_code, cmp0, cmp1);
+	  break;
+	}
+      fatal_insn ("bad test", gen_rtx_fmt_ee (test_code, VOIDmode, cmp0, cmp1));
+
     case E_DFmode:
-      if (TARGET_HARD_FLOAT)
+      if (TARGET_FLOAT64)
 	{
 	  cmp = gen_float_relational (test_code, cmp0, cmp1);
 	  break;
@@ -993,8 +1000,8 @@ gen_conditional_move (enum rtx_code code, machine_mode mode,
       return gen_rtx_fmt_ee (code, VOIDmode, op0, op1);
     }
 
-  if (TARGET_HARD_FLOAT
-      && (mode == SFmode || mode == DFmode))
+  if ((TARGET_FLOAT32 && mode == SFmode)
+      || (TARGET_FLOAT64 && mode == DFmode))
     return gen_float_relational (code, op0, op1);
 
   return 0;
@@ -3036,7 +3043,8 @@ xtensa_option_override (void)
 	  else if (GP_REG_P (regno))
 	    temp = ((regno & 1) == 0 || (size <= UNITS_PER_WORD));
 	  else if (FP_REG_P (regno))
-	    temp = (TARGET_HARD_FLOAT && (mode == SFmode || mode == DFmode));
+	    temp = ((TARGET_FLOAT32 && mode == SFmode)
+		    || (TARGET_FLOAT64 && mode == DFmode));
 	  else if (BR_REG_P (regno))
 	    temp = (TARGET_BOOLEANS && (mode == CCmode));
 	  else
@@ -4706,9 +4714,9 @@ xtensa_rtx_costs (rtx x, machine_mode mode, int outer_code,
     case NEG:
       {
 	if (mode == SFmode)
-	  *total = COSTS_N_INSNS (TARGET_HARD_FLOAT ? 1 : 50);
+	  *total = COSTS_N_INSNS (TARGET_FLOAT32 ? 1 : 50);
 	else if (mode == DFmode)
-	  *total = COSTS_N_INSNS (50);
+	  *total = COSTS_N_INSNS (TARGET_FLOAT64 ? 1 : 50);
 	else if (mode == DImode)
 	  *total = COSTS_N_INSNS (4);
 	else
@@ -4720,8 +4728,10 @@ xtensa_rtx_costs (rtx x, machine_mode mode, int outer_code,
     case MINUS:
       {
 	if (mode == SFmode)
-	  *total = COSTS_N_INSNS (TARGET_HARD_FLOAT ? 1 : 50);
-	else if (mode == DFmode || mode == DImode)
+	  *total = COSTS_N_INSNS (TARGET_FLOAT32 ? 1 : 50);
+	else if (mode == DFmode)
+	  *total = COSTS_N_INSNS (TARGET_FLOAT64 ? 1 : 50);
+	else if (mode == DImode)
 	  *total = COSTS_N_INSNS (50);
 	else
 	  *total = COSTS_N_INSNS (1);
@@ -4731,9 +4741,9 @@ xtensa_rtx_costs (rtx x, machine_mode mode, int outer_code,
     case MULT:
       {
 	if (mode == SFmode)
-	  *total = COSTS_N_INSNS (TARGET_HARD_FLOAT ? 4 : 50);
+	  *total = COSTS_N_INSNS (TARGET_FLOAT32 ? 4 : 50);
 	else if (mode == DFmode)
-	  *total = COSTS_N_INSNS (50);
+	  *total = COSTS_N_INSNS (TARGET_FLOAT64 ? 4 : 50);
 	else if (mode == DImode)
 	  *total = COSTS_N_INSNS (TARGET_MUL32_HIGH ? 10 : 50);
 	else if (TARGET_MUL32)
@@ -4752,12 +4762,12 @@ xtensa_rtx_costs (rtx x, machine_mode mode, int outer_code,
       {
 	if (mode == SFmode)
 	  {
-	    *total = COSTS_N_INSNS (TARGET_HARD_FLOAT_DIV ? 8 : 50);
+	    *total = COSTS_N_INSNS (TARGET_FLOAT32_DIV ? 8 : 50);
 	    return true;
 	  }
 	else if (mode == DFmode)
 	  {
-	    *total = COSTS_N_INSNS (50);
+	    *total = COSTS_N_INSNS (TARGET_FLOAT64_DIV ? 8 : 50);
 	    return true;
 	  }
       }
@@ -4777,7 +4787,9 @@ xtensa_rtx_costs (rtx x, machine_mode mode, int outer_code,
 
     case SQRT:
       if (mode == SFmode)
-	*total = COSTS_N_INSNS (TARGET_HARD_FLOAT_SQRT ? 8 : 50);
+	*total = COSTS_N_INSNS (TARGET_FLOAT32_SQRT ? 8 : 50);
+      else if (mode == DFmode)
+	*total = COSTS_N_INSNS (TARGET_FLOAT64_SQRT ? 8 : 50);
       else
 	*total = COSTS_N_INSNS (50);
       return true;
@@ -5639,7 +5651,7 @@ xtensa_zero_call_used_regs (HARD_REG_SET selected_regs)
 					   rtvec_alloc (0),
 					   UNKNOWN_LOCATION));
 	}
-      else if (TARGET_HARD_FLOAT && FP_REG_P (regno))
+      else if (TARGET_FLOAT32 && FP_REG_P (regno))
 	emit_move_insn (gen_rtx_REG (SFmode, regno),
 			gen_rtx_REG (SFmode, zeroed_regno));
       else if (TARGET_MAC16 && ACC_REG_P (regno))
@@ -5948,7 +5960,7 @@ FPreg_neg_scaled_simm12b (rtx_insn *insn)
 		REG_DEAD (reg:SF gpr)
      where cst is a negatively-scaled signed 12-bit integer immediate
      value.  */
-  if (TARGET_HARD_FLOAT && !TARGET_CONST16
+  if (TARGET_FLOAT32 && !TARGET_CONST16
       && GET_CODE (pat = PATTERN (insn)) == SET
       && REG_P (dest = SET_DEST (pat)) && GP_REG_P (REGNO (dest))
       && GET_MODE (dest) == SFmode
