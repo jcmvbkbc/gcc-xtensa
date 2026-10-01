@@ -94,6 +94,7 @@
 ;; Single/Double precision floating point iterator
 (define_mode_iterator SDF [SF DF])
 (define_mode_attr sd [(SF "s") (DF "d")])
+(define_mode_attr sdf_mode_bits [(SF "32") (DF "64")])
 
 ;; This iterator and attribute allow signed/unsigned FP truncations to be
 ;; generated from one template.
@@ -256,7 +257,7 @@
   [(set (match_operand:SDF 0 "register_operand" "=f")
 	(plus:SDF (match_operand:SDF 1 "register_operand" "%f")
 		  (match_operand:SDF 2 "register_operand" "f")))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "add.<sd>\t%0, %1, %2"
   [(set_attr "type"	"fmadd")
    (set_attr "mode"	"<MODE>")
@@ -326,7 +327,7 @@
   [(set (match_operand:SDF 0 "register_operand" "=f")
 	(minus:SDF (match_operand:SDF 1 "register_operand" "f")
 		   (match_operand:SDF 2 "register_operand" "f")))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "sub.<sd>\t%0, %1, %2"
   [(set_attr "type"	"fmadd")
    (set_attr "mode"	"<MODE>")
@@ -435,7 +436,7 @@
   [(set (match_operand:SDF 0 "register_operand" "=f")
 	(mult:SDF (match_operand:SDF 1 "register_operand" "%f")
 		  (match_operand:SDF 2 "register_operand" "f")))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "mul.<sd>\t%0, %1, %2"
   [(set_attr "type"	"fmadd")
    (set_attr "mode"	"<MODE>")
@@ -446,7 +447,7 @@
 	(fma:SDF (match_operand:SDF 1 "register_operand" "f")
 		 (match_operand:SDF 2 "register_operand" "f")
 		 (match_operand:SDF 3 "register_operand" "0")))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "madd.<sd>\t%0, %1, %2"
   [(set_attr "type"	"fmadd")
    (set_attr "mode"	"<MODE>")
@@ -458,7 +459,7 @@
 	(fma:SDF (neg:SDF (match_operand:SDF 1 "register_operand" "f"))
 		 (match_operand:SDF 2 "register_operand" "f")
 		 (match_operand:SDF 3 "register_operand" "0")))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "msub.<sd>\t%0, %1, %2"
   [(set_attr "type"	"fmadd")
    (set_attr "mode"	"<MODE>")
@@ -525,7 +526,7 @@
 (define_insn "abs<mode>2"
   [(set (match_operand:SDF 0 "register_operand" "=f")
 	(abs:SDF (match_operand:SDF 1 "register_operand" "f")))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "abs.<sd>\t%0, %1"
   [(set_attr "type"	"farith")
    (set_attr "mode"	"<MODE>")
@@ -701,7 +702,7 @@
   [(set (match_operand:SDF 0 "register_operand")
         (neg:SDF (match_operand:SDF 1 "register_operand")))
    (clobber (match_scratch:SI 2))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   {@ [cons: =0, 1, =2; attrs: type, length]
      [D, D, &a; arith , 7] #
      [f, f,  X; farith, 3] neg.<sd>\t%0, %1
@@ -1142,7 +1143,7 @@
 (define_insn "fix<s_fix>_trunc<mode>si2"
   [(set (match_operand:SI 0 "register_operand" "=a")
 	(any_fix:SI (match_operand:SDF 1 "register_operand" "f")))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "<m_fix>.<sd>\t%0, %1, 0"
   [(set_attr "type"	"fconv")
    (set_attr "mode"	"<MODE>")
@@ -1152,7 +1153,7 @@
   [(set (match_operand:SI 0 "register_operand" "=a")
 	(any_fix:SI (plus:SDF (match_operand:SDF 1 "register_operand" "f")
 			      (match_dup 1))))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "<m_fix>.<sd>\t%0, %1, 1"
   [(set_attr "type"	"fconv")
    (set_attr "mode"	"<MODE>")
@@ -1162,7 +1163,7 @@
   [(set (match_operand:SI 0 "register_operand" "=a")
 	(any_fix:SI (mult:SDF (match_operand:SDF 1 "register_operand" "f")
 			      (match_operand:SDF 2 "fix_scaling_operand" ""))))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "<m_fix>.<sd>\t%0, %1, %U2"
   [(set_attr "type"	"fconv")
    (set_attr "mode"	"<MODE>")
@@ -1171,7 +1172,7 @@
 (define_insn "float<s_float>si<mode>2"
   [(set (match_operand:SDF 0 "register_operand" "=f")
 	(any_float:SDF (match_operand:SI 1 "register_operand" "a")))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "<m_float>.<sd>\t%0, %1, 0"
   [(set_attr "type"	"fconv")
    (set_attr "mode"	"<MODE>")
@@ -1181,7 +1182,7 @@
   [(set (match_operand:SDF 0 "register_operand" "=f")
 	(mult:SDF (any_float:SDF (match_operand:SI 1 "register_operand" "a"))
 		  (match_operand:SDF 2 "float_scaling_operand" "")))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "<m_float>.<sd>\t%0, %1, %V2"
   [(set_attr "type"	"fconv")
    (set_attr "mode"	"<MODE>")
@@ -1190,7 +1191,7 @@
 (define_insn "l<m_round><mode>si2"
   [(set (match_operand:SI 0 "register_operand" "=a")
 	(unspec:SI [(match_operand:SDF 1 "register_operand" "f")] ANY_ROUND))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "<m_round>.<sd>\t%0, %1, 0"
   [(set_attr "type"	"fconv")
    (set_attr "mode"	"<MODE>")
@@ -1200,7 +1201,7 @@
   [(set (match_operand:SI 0 "register_operand" "=a")
 	(unspec:SI [(plus:SDF (match_operand:SDF 1 "register_operand" "f")
 			      (match_dup 1))] ANY_ROUND))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "<m_round>.<sd>\t%0, %1, 1"
   [(set_attr "type"	"fconv")
    (set_attr "mode"	"<MODE>")
@@ -1210,7 +1211,7 @@
   [(set (match_operand:SI 0 "register_operand" "=a")
 	(unspec:SI [(mult:SDF (match_operand:SDF 1 "register_operand" "f")
 			      (match_operand:SDF 2 "fix_scaling_operand" ""))] ANY_ROUND))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "<m_round>.<sd>\t%0, %1, %U2"
   [(set_attr "type"	"fconv")
    (set_attr "mode"	"<MODE>")
@@ -1497,7 +1498,7 @@
    (set (match_dup 1)
 	(plus:SI (match_dup 1)
 		 (match_operand:SI 2 "fpmem_offset_operand" "")))]
-  "TARGET_HARD_FLOAT && TARGET_HARD_FLOAT_POSTINC"
+  "TARGET_FLOAT<sdf_mode_bits> && TARGET_HARD_FLOAT_POSTINC"
 {
   if (TARGET_SERIALIZE_VOLATILE && volatile_refs_p (PATTERN (insn)))
     output_asm_insn ("memw", operands);
@@ -1513,7 +1514,7 @@
    (set (match_dup 0)
 	(plus:SI (match_dup 0)
 		 (match_operand:SI 2 "fpmem_offset_operand" "")))]
-  "TARGET_HARD_FLOAT && TARGET_HARD_FLOAT_POSTINC"
+  "TARGET_FLOAT<sdf_mode_bits> && TARGET_HARD_FLOAT_POSTINC"
 {
   if (TARGET_SERIALIZE_VOLATILE && volatile_refs_p (PATTERN (insn)))
     output_asm_insn ("memw", operands);
@@ -1895,7 +1896,7 @@
     [(match_operand:SDF 1 "register_operand")
      (match_operand:SDF 2 "register_operand")])
    (match_operand 3 "")]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
 {
   xtensa_expand_conditional_branch (operands, <MODE>mode);
   DONE;
@@ -2383,7 +2384,7 @@
    (match_operator:SI 1 "comparison_operator"
     [(match_operand:SDF 2 "register_operand")
      (match_operand:SDF 3 "register_operand")])]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
 {
   if (!xtensa_expand_scc (operands, <MODE>mode))
     FAIL;
@@ -2485,7 +2486,7 @@
   [(set (match_operand:CC 0 "register_operand" "=b")
 	(any_scc_sf:CC (match_operand:SDF 1 "register_operand" "f")
 		       (match_operand:SDF 2 "register_operand" "f")))]
-  "TARGET_HARD_FLOAT"
+  "TARGET_FLOAT<sdf_mode_bits>"
   "<scc_sf>.<sd>\t%0, %1, %2"
   [(set_attr "type"	"farith")
    (set_attr "mode"	"BL")
