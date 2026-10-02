@@ -5986,6 +5986,7 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
       else
 	arg = c_objc_common_truthvalue_conversion (location, arg);
       ret = invert_truthvalue_loc (location, arg);
+      eptype = NULL_TREE;
       /* If the TRUTH_NOT_EXPR has been folded, reset the location.  */
       if (EXPR_P (ret) && EXPR_HAS_LOCATION (ret))
 	location = EXPR_LOCATION (ret);
