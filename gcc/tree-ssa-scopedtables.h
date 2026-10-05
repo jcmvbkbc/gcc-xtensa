@@ -69,7 +69,6 @@ class expr_hash_elt
 {
  public:
   expr_hash_elt (gimple *, tree);
-  expr_hash_elt (tree);
   expr_hash_elt (struct hashable_expr *, tree);
   expr_hash_elt (class expr_hash_elt &);
   ~expr_hash_elt ();
@@ -201,7 +200,6 @@ class const_and_copies
   const_and_copies (class const_and_copies &);
 };
 
-void initialize_expr_from_cond (tree cond, struct hashable_expr *expr);
 void record_conditions (vec<cond_equivalence> *p, tree, tree);
 
 #endif /* GCC_TREE_SSA_SCOPED_TABLES_H */

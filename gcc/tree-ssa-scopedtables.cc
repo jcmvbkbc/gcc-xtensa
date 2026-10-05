@@ -944,7 +944,7 @@ expr_elt_hasher::equal (const value_type &p1, const compare_type &p2)
    comparison or logical negation.  A constant or a variable is
    not permitted.  */
 
-void
+static void
 initialize_expr_from_cond (tree cond, struct hashable_expr *expr)
 {
   expr->type = boolean_type_node;
