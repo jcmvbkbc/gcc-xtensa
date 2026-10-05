@@ -692,6 +692,11 @@ release_ssa_name_fn (struct function *fn, tree var)
       int saved_ssa_name_version = SSA_NAME_VERSION (var);
       use_operand_p imm = &(SSA_NAME_IMM_USE_NODE (var));
 
+      /* An active range query caches information keyed off both VAR and its
+	 version, communicate that this node is about to be cleared.  */
+      if (fn->x_range_query)
+	fn->x_range_query->reset_range_info (var);
+
       if (MAY_HAVE_DEBUG_BIND_STMTS)
 	insert_debug_temp_for_var_def (NULL, var);
 
