@@ -1,3 +1,68 @@
+2026-10-05  Dominic P  <gcc@gcc.dp11.uk>
+
+	PR c/123370
+	* gcc.dg/pr123370.c: New test.
+	* gcc.target/i386/pr123370.c: New test.
+
+2026-10-05  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/127719
+	* gcc.dg/pr127719.c: New.
+	* g++.dg/pr127729.C: New.
+
+2026-10-05  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* gcc.dg/tree-ssa/ssa-dom-simplify-5.c: New test.
+
+2026-10-05  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* gcc.dg/tree-ssa/ssa-dom-simplify-2.c: New test.
+
+2026-10-05  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* gcc.dg/tree-ssa/ssa-dom-simplify-4.c: New test.
+
+2026-10-05  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* gcc.dg/tree-ssa/predcom-7.c: Add -fno-tree-dominator-opts.
+	* gcc.dg/tree-ssa/ssa-dom-simplify-3.c: New test.
+
+2026-10-05  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127693
+	* gcc.dg/tree-ssa/ssa-fre-118.c: New testcase.
+
+2026-10-05  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127693
+	* gcc.dg/tree-ssa/ssa-fre-117.c: New testcase.
+
+2026-10-05  Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR fortran/127701
+	* gfortran.dg/contiguous_18.f90: New test.
+
+2026-10-05  Avinash Jayakar  <avinashd@linux.ibm.com>
+
+	PR testsuite/127175
+	* gcc.target/powerpc/vec-replace-word-runnable_1.c: Correct expected results
+	for BE target.
+	* gcc.target/powerpc/vec-replace-word-runnable_2.c: Likewise.
+
+2026-10-05  Avinash Jayakar  <avinashd@linux.ibm.com>
+
+	PR testsuite/127189
+	* gcc.target/powerpc/vsx-load-element-extend-int.c:
+	* gcc.target/powerpc/vsx-load-element-extend-longlong.c:
+	* gcc.target/powerpc/vsx-load-element-extend-short.c:
+	* gcc.target/powerpc/vsx-store-element-truncate-longlong.c:
+
+2026-10-05  Jeevitha Palanisamy  <jeevitha@linux.ibm.com>
+
+	PR target/127030
+	* gcc.target/powerpc/vec-permute-ext-runnable.c: Fix the
+	byte permutation indices for big-endian targets.
+
 2026-10-04  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
 
 	PR fortran/127724

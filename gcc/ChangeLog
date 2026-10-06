@@ -1,3 +1,145 @@
+2026-10-05  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/127719
+	* gimple-range-gori.cc (range_def_chain::clear): Do not
+	recalculate a def chain when it has just been cleared.
+	* tree-ssanames.cc (release_ssa_name_fn): Clear range info.
+
+2026-10-05  linden  <bestxmg@gmail.com>
+
+	* text-art/types.h (text_art::array2::set): Add overload taking
+	element_t &&.
+
+2026-10-05  linden  <bestxmg@gmail.com>
+
+	* xml.cc (node_with_children::add_text): Remove no-op std::move.
+
+2026-10-05  linden  <bestxmg@gmail.com>
+
+	* diagnostics/source-printing.cc (to_text::push_html_tag)
+	(to_text::push_html_tag_with_class, to_text::add_html_tag_with_class)
+	(to_html::push_html_tag, to_html::push_html_tag_with_class)
+	(to_html::add_html_tag_with_class): Take tag/class names as
+	const char * rather than std::string by value.
+
+2026-10-05  linden  <bestxmg@gmail.com>
+
+	* diagnostics/html-sink.cc (add_labelled_value): std::move 'id' and 'label' into
+	the xml::printer calls.
+
+2026-10-05  Martin Jambor  <mjambor@suse.cz>
+
+	* ipa-cp.cc (overall_scaled_runtime): New.
+	(good_cloning_opportunity_p): Scale PGO evaluations by
+	overall_scaled_runtime.
+	(ipcp_propagate_stage): Calculate also overall_scaled_runtime and
+	print it and unscaled time.
+	(ipa_cp_cc_finalize): Set overall_scaled_runtime to zero.
+	* params.opt (ipa-cp-profile-runtime-scaling): New.
+	* doc/params.texi (ipa-cp-profile-runtime-scaling): New.
+
+2026-10-05  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.cc (hppa_rtx_costs_shadd_p): Strip SUBREG wrappers
+	from inner operands when checking if X represents a possible
+	shadd pattern.
+
+2026-10-05  Alfie Richards  <alfie.richards@arm.com>
+
+	* config/aarch64/aarch64.cc (aarch64_autovectorize_vector_modes):
+	All logic to only use aarch64-autovec-mode when specified.
+	* config/aarch64/aarch64.opt: Add --param=aarch64-autovec-mode.
+	* doc/params.texi: Document  --param=aarch64-autovec-mode.
+
+2026-10-05  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* tree-ssa-dom.cc (single_block_loop_p): Remove.
+	(record_edge_info): Do not record equivalences on the exit edge of
+	a single block loop.
+
+2026-10-05  Alex Coplan  <alex.coplan@arm.com>
+
+	* tree-vect-slp.cc (vect_build_slp_tree_2): In the two_operators
+	case, avoid setting the code field on the plus/minus nodes.
+
+2026-10-05  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* tree-ssa-scopedtables.cc (build_and_record_new_cond): Remove.
+	(record_conditions): Do not derive the implied conditions.
+
+2026-10-05  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* tree-ssa-dom.cc (dom_opt_dom_walker::const_or_copy_of_stmt): New.
+	(dom_opt_dom_walker::eliminate_redundant_computations): Ask it on
+	a lookup miss.
+	* tree-ssa-scopedtables.cc (simplify_binary_operation): Remove.
+	(lookup_avail_expr): Do not call it.
+	* tree-ssa-scopedtables.h (simplify_binary_operation): Remove.
+
+2026-10-05  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* tree-ssa-dom.cc (record_equivalences_from_incoming_edge): Make a
+	member of dom_opt_dom_walker and use its tables.
+	(eliminate_redundant_computations): Same.
+	(record_equivalences_from_stmt): Same.
+	(dom_opt_dom_walker::before_dom_children): Adjust the calls.
+	(dom_opt_dom_walker::optimize_stmt): Same.
+
+2026-10-05  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* tree-ssa-dom.cc (dom_opt_dom_walker::optimize_stmt): Remove the
+	boolean range special case.
+
+2026-10-05  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* tree-ssa-dom.cc (dom_opt_dom_walker::m_dummy_cond): Remove.
+	(dom_opt_dom_walker::test_for_singularity): Remove.
+	(dom_opt_dom_walker::fold_cond): Remove.
+	(dom_opt_dom_walker::simplify_stmt): New.
+	(dom_opt_dom_walker::optimize_stmt): Call it in place of
+	test_for_singularity and fold_cond.
+
+2026-10-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/extend.texi (Attribute Syntax): Remove stray period.
+
+2026-10-05  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127693
+	* tree-ssa-alias.h (get_continuation_for_phi): Remove
+	abort_on_visited argument.
+	* tree-ssa-alias.cc (maybe_skip_until): Likewise.  Always
+	succeed when reaching an already visited region.
+	(get_continuation_for_phi): Remove abort_on_visited argument.
+	(walk_non_aliased_vuses): Clear the visited bitmap when
+	translating the reference instead of tracking whether
+	we translated.
+	* ipa-prop.cc (determine_known_aggregate_parts): Adjust.
+	* tree-ssa-pre.cc (translate_vuse_through_block): Likewise.
+
+2026-10-05  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127693
+	* tree-ssa-alias.cc (cmp_intpair): New qsort helper.
+	(get_continuation_for_phi): Sort the PHI args and avoid
+	processing duplicates.
+
+2026-10-05  Andreas Schwab  <schwab@suse.de>
+
+	* doc/extend.texi (Other Builtins): Fix typo.
+
+2026-10-05  Avinash Jayakar  <avinashd@linux.ibm.com>
+
+	PR target/127632
+	* config/rs6000/rs6000-c.cc (altivec_resolve_overloaded_builtin):
+	Initialize size to 0.
+
+2026-10-05  Takayuki 'January June' Suwa  <jjsuwa_sys3175@yahoo.co.jp>
+
+	* config/xtensa/xtensa.md
+	(adddi3): Remove the previous sloppy workaround.
+	(adddi3_lowpart_0, adddi3_lowpart_1): New insn_and_split patterns.
+
 2026-10-04  Roger Sayle  <roger@nextmovesoftware.com>
 	    Uros Bizjak  <ubizjak@gmail.com>
 

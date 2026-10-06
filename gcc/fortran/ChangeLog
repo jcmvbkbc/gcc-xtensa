@@ -1,3 +1,12 @@
+2026-10-05  Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR fortran/127701
+	* expr.cc (gfc_is_simply_contiguous): Only forward to the associate
+	target if there is no subreference after the associate name.  Also
+	forward to the associate target for a non-full array reference.
+	Continue checking the array reference even if the associate target
+	is simply contiguous.
+
 2026-10-04  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
 
 	PR fortran/127724

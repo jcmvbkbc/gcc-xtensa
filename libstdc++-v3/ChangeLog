@@ -1,3 +1,32 @@
+2026-10-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/115955
+	* src/c++20/atomic.cc (__waitable_state::_S_state_for): Use a
+	real hash function to map addresses to waitable states.
+
+2026-10-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stdexcept_throwfwd.h (__throw_out_of_range_fmt):
+	Do not use __format__ attribute for C++98.
+
+2026-10-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/bitset (operator>>): Define __array_len to ensure
+	that the array size is never zero. Add uninitialized attribute
+	to __buf.
+
+2026-10-05  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	* include/std/mdspan (layout_stride::mapping::_M_check_unique):
+	Change the algorithm to correctly recognize examples from LWG4606
+	as unique.
+	(layout_stride::mapping(const extents_type&, span<....>)):
+	Assert on _M_check_unique only for non-zero ranks.
+	* testsuite/23_containers/mdspan/layouts/stride_neg.cc:
+	Expand tests cases and moved some examples to...
+	* testsuite/23_containers/mdspan/layouts/stride_debug_neg.cc:
+	Separate test for issues detected only in debug mode.
+
 2026-10-02  Jonathan Wakely  <jwakely@redhat.com>
 
 	PR libstdc++/127675
