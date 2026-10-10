@@ -3167,6 +3167,8 @@ xtensa_modes_tieable_p (machine_mode mode1, machine_mode mode2)
    'G', CONST_DOUBLE:SF, print 0~3 when rval is 0.0f, 1.0f, 2.0f, or 0.5f,
 	respectively.
    'D'  REG, print second register of double-word register operand
+   'T'  REG, print register holding top bits of double-word register operand
+   'B'  REG, print register holding bottom bits of double-word register operand
    'N'  MEM, print address of next word following a memory operand
    'v'  MEM, if memory reference is volatile, output a MEMW before it
    't'  any constant, add "@h" suffix for top 16 bits
@@ -3199,6 +3201,20 @@ print_operand (FILE *file, rtx x, int letter)
 	fprintf (file, "%s", reg_names[xt_true_regnum (x) + 1]);
       else
 	output_operand_lossage ("invalid %%D value");
+      break;
+
+    case 'T':
+      if (REG_P (x) || SUBREG_P (x))
+	fprintf (file, "%s", reg_names[xt_true_regnum (x) + !TARGET_BIG_ENDIAN]);
+      else
+	output_operand_lossage ("invalid %%T value");
+      break;
+
+    case 'B':
+      if (REG_P (x) || SUBREG_P (x))
+	fprintf (file, "%s", reg_names[xt_true_regnum (x) + !!TARGET_BIG_ENDIAN]);
+      else
+	output_operand_lossage ("invalid %%B value");
       break;
 
     case 'v':

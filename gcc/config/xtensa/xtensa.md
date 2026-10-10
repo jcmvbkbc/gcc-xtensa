@@ -1608,8 +1608,8 @@
    || register_operand (operands[1], DFmode)"
   {@ [cons: =0, 1; attrs: type, length]
      [f, Gc; farith, 3] const.d\t%0, %G1
-     [f,  r; farith, 3] wfrd\t%0, %D1, %1
-     [a,  f; farith, 6] rfrd\t%D0, %1\;rfr\t%0, %1
+     [f,  r; farith, 3] wfrd\t%0, %T1, %B1
+     [a,  f; farith, 6] rfrd\t%T0, %1\;rfr\t%B0, %1
      [f,  f; farith, 3] mov.d\t%0, %1
      [f,  U; fload , 3] %v1ldi\t%0, %1
      [U,  f; fstore, 3] %v0sdi\t%1, %0
