@@ -59,9 +59,9 @@ extern char *xtensa_emit_sibcall (int, rtx *);
 extern bool xtensa_tls_referenced_p (rtx);
 extern enum rtx_code xtensa_shlrd_which_direction (rtx, rtx);
 extern bool xtensa_postreload_completed_p (void);
-extern char *xtensa_bswapsi2_output (rtx_insn *, const char *);
 extern bool xtensa_expand_load_force_l32 (rtx *, machine_mode, machine_mode,
 					  int);
+extern const char *xtensa_output_sar_setup_insn (rtx *);
 
 #ifdef TREE_CODE
 extern void init_cumulative_args (CUMULATIVE_ARGS *, int);

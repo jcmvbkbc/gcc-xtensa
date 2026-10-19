@@ -40,6 +40,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "recog.h"
 #include "diagnostic-core.h"
 #include "cfgrtl.h"
+#include "cfganal.h"
 #include "output.h"
 #include "addresses.h"
 #include "fold-const.h"
@@ -2548,91 +2549,170 @@ xtensa_postreload_completed_p (void)
 }
 
 
-/* Return the asm output string of bswapsi2_internal insn pattern.
-   It does this by scanning backwards for the BB from the specified insn,
-   and if an another bswapsi2_internal is found, it omits the instruction
-   to set SAR to 8. If not found, or if a CALL, JUMP, ASM, or other insn
-   that clobbers SAR is found first, prepend an instruction to set SAR to
-   8 as usual.  */
+/* Return the SET_SRC of an explicit SAR setup, or NULL_RTX.  */
 
-static int
-xtensa_bswapsi2_output_1 (rtx_insn *insn)
+static rtx
+xtensa_sar_setup_src (rtx_insn *insn)
 {
-  int icode;
-  rtx pat;
-  const char *iname;
+  rtx set, src;
 
-  /* CALL insn do not preserve SAR.
-     JUMP insn only appear at the end of BB, so they do not need to be
-     considered when scanning backwards.  */
-  if (CALL_P (insn))
-    return -1;
+  if (! INSN_P (insn))
+    return NULL_RTX;
 
-  switch (icode = INSN_CODE (insn))
-    {
-    /* rotate insns clobber SAR.  */
-    case CODE_FOR_rotlsi3:
-    case CODE_FOR_rotrsi3:
-      return -1;
-    /* simple shift insns clobber SAR if non-immediate shift amounts.  */
-    case CODE_FOR_ashlsi3_internal:
-    case CODE_FOR_ashrsi3:
-    case CODE_FOR_lshrsi3:
-      if (! CONST_INT_P (XEXP (SET_SRC (PATTERN (insn)), 1)))
-	return -1;
-      break;
-    /* this insn always set SAR to 8.  */
-    case CODE_FOR_bswapsi2_internal:
-      return 1;
-    default:
-      break;
-    }
+  int code = recog_memoized (insn);
+  if (code != CODE_FOR_xtensa_sar_setup
+      && code != CODE_FOR_xtensa_sar_setupi)
+    return NULL_RTX;
 
-  /* "*shift_per_byte" and "*shlrd_*" complex shift insns clobber SAR.  */
-  if (icode >= CODE_FOR_nothing
-      && (! strcmp (iname = insn_data[icode].name, "*shift_per_byte")
-	  || ! strncmp (iname, "*shlrd_", 7)))
-    return -1;
-
-  /* asm statements may also clobber SAR, so they are anything goes.  */
-  if (NONJUMP_INSN_P (insn))
-    switch (GET_CODE (pat = PATTERN (insn)))
-      {
-      case SET:
-	return GET_CODE (SET_SRC (pat)) == ASM_OPERANDS ? -1 : 0;
-      case PARALLEL:
-	return (GET_CODE (pat = XVECEXP (pat, 0, 0)) == SET
-		&& GET_CODE (SET_SRC (pat)) == ASM_OPERANDS)
-	       || GET_CODE (pat) == ASM_OPERANDS
-	       || GET_CODE (pat) == ASM_INPUT ? -1 : 0;
-      case ASM_OPERANDS:
-	return -1;
-      default:
-	break;
-    }
-
-  /* All other insns are not interested in SAR.  */
-  return 0;
+  set = single_set (insn);
+  gcc_assert (set && REG_P (SET_DEST (set))
+	      && REGNO (SET_DEST (set)) == SAR_REGNUM);
+  src = SET_SRC (set);
+  gcc_assert (GET_CODE (src) == UNSPEC
+	      && XINT (src, 1) == UNSPEC_SAR_SETUP);
+  return src;
 }
 
-char *
-xtensa_bswapsi2_output (rtx_insn *insn, const char *output)
+/* Return true if INSN changes SAR other than through a recognized setup.  */
+
+static bool
+xtensa_sar_unknown_set_p (rtx_insn *insn)
 {
-  static char result[128];
-  int i;
+  return (CALL_P (insn)
+	  || (INSN_P (insn)
+	      && reg_set_p (regno_reg_rtx[SAR_REGNUM], insn)));
+}
 
-  strcpy (result, "ssai\t8\n\t");
-  while ((insn = prev_nonnote_nondebug_insn_bb (insn)))
-    if ((i = xtensa_bswapsi2_output_1 (insn)) < 0)
-      break;
-    else if (i > 0)
-      {
-	result[0] = '\0';
-	break;
-      }
-  strcat (result, output);
+/* Delete redundant explicit SAR setups.  A block with one normal
+   predecessor inherits that block's SAR value, so a duplicate setup
+   on a fallthrough or unconditional edge is removed too.  */
 
-  return result;
+static void
+xtensa_eliminate_redundant_sar_setups (void)
+{
+  int n_blocks = n_basic_blocks_for_fn (cfun);
+  auto_vec<int> order (n_blocks);
+  auto_vec<rtx> out_src;
+  int i, n;
+
+  order.safe_grow (n_blocks);
+  out_src.safe_grow_cleared (last_basic_block_for_fn (cfun));
+  n = pre_and_rev_post_order_compute (NULL, order.address (), false);
+
+  for (i = 0; i < n; i++)
+    {
+      basic_block bb = BASIC_BLOCK_FOR_FN (cfun, order[i]);
+      rtx known_src = NULL_RTX;
+      rtx_insn *insn, *next;
+
+      /* One normal predecessor: its ending SAR value reaches here.
+	 Skip abnormal and EH edges; those leave from the middle of
+	 the predecessor, not from its recorded end state.  */
+      if (single_pred_p (bb))
+	{
+	  edge e = single_pred_edge (bb);
+	  if ((e->flags & EDGE_COMPLEX) == 0)
+	    known_src = out_src[e->src->index];
+	}
+
+      FOR_BB_INSNS_SAFE (bb, insn, next)
+	{
+	  if (! NONDEBUG_INSN_P (insn))
+	    continue;
+
+	  rtx src = xtensa_sar_setup_src (insn);
+	  if (src)
+	    {
+	      if (known_src && rtx_equal_p (known_src, src))
+		{
+		  delete_insn (insn);
+		  continue;
+		}
+	      known_src = src;
+	      continue;
+	    }
+
+	  if (known_src && modified_in_p (known_src, insn))
+	    known_src = NULL_RTX;
+	  if (xtensa_sar_unknown_set_p (insn))
+	    known_src = NULL_RTX;
+	}
+
+      out_src[bb->index] = known_src;
+    }
+}
+
+/* Return the asm output string of an explicit SAR setup.  */
+
+const char *
+xtensa_output_sar_setup_insn (rtx *operands)
+{
+  switch (INTVAL (operands[1]))
+    {
+    case XTENSA_SAR_SSL:	return "ssl\t%0";
+    case XTENSA_SAR_SSR:	return "ssr\t%0";
+    case XTENSA_SAR_SSA8B:	return "ssa8b\t%0";
+    case XTENSA_SAR_SSA8L:	return "ssa8l\t%0";
+    default:			gcc_unreachable ();
+    }
+}
+
+/* If every explicit SAR setup in hardware loop LOOP has the same source,
+   and that source is invariant, move one setup before LOOP_START.  */
+
+static void
+xtensa_hoist_loop_sar (hwloop_info loop, rtx_insn *loop_start)
+{
+  rtx src = NULL_RTX;
+  basic_block bb;
+  rtx_insn *insn;
+  unsigned int i;
+  auto_vec<rtx_insn *> setters;
+
+  FOR_EACH_VEC_ELT (loop->blocks, i, bb)
+    FOR_BB_INSNS (bb, insn)
+      if (NONDEBUG_INSN_P (insn))
+	{
+	  rtx x = xtensa_sar_setup_src (insn);
+	  if (x)
+	    {
+	      if (src && ! rtx_equal_p (x, src))
+		return;
+	      src = x;
+	      setters.safe_push (insn);
+	    }
+	  else if (xtensa_sar_unknown_set_p (insn))
+	    {
+	      return;
+	    }
+	}
+
+  if (! src)
+    return;
+
+  rtx op = XVECEXP (src, 0, 0);
+  rtx kind = XVECEXP (src, 0, 1);
+  if ((REG_P (op)
+	  && overlaps_hard_reg_set_p (loop->regs_set_in_loop,
+				      GET_MODE (op), REGNO (op)))
+      || (! REG_P (op) && ! CONST_INT_P (op)))
+    return;
+
+  rtx setup;
+  if (CONST_INT_P (op))
+    {
+      gcc_assert (INTVAL (kind) == XTENSA_SAR_SSAI);
+      setup = gen_xtensa_sar_setupi (op, kind);
+    }
+  else
+    setup = gen_xtensa_sar_setup (op, kind);
+  emit_insn_before (setup, loop_start);
+  FOR_EACH_VEC_ELT (setters, i, insn)
+    delete_insn (insn);
+
+  if (dump_file)
+    fprintf (dump_file, ";; loop %d: SAR setup hoisted out of %u insns\n",
+	     loop->loop_no, setters.length ());
 }
 
 
@@ -2881,6 +2961,11 @@ xtensa_debugger_regno (int regno)
       first = 0x200;	/* Start of Xtensa special registers.  */
       regno = 16;	/* ACCLO is special register 16.  */
     }
+  else if (SAR_REG_P (regno))
+    {
+      first = 0x200;	/* Start of Xtensa special registers.  */
+      regno = 3;	/* SAR is special register 3.  */
+    }
 
   /* When optimizing, we sometimes get asked about pseudo-registers
      that don't represent hard registers.  Return 0 for these.  */
@@ -3042,7 +3127,9 @@ xtensa_option_override (void)
 	{
 	  int temp;
 
-	  if (ACC_REG_P (regno))
+	  if (SAR_REG_P (regno))
+	    temp = mode == SImode;
+	  else if (ACC_REG_P (regno))
 	    temp = (TARGET_MAC16
 		    && (mclass == MODE_INT) && (size <= UNITS_PER_WORD));
 	  else if (GP_REG_P (regno))
@@ -4544,7 +4631,7 @@ xtensa_adjust_reg_alloc_order (void)
   {
      9, 10, 11,  7,  6,  5,  4,  3,  2,  8,  0, 12, 13, 14, 15, 18,
     19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-     1, 16, 17, 35,
+     1, 16, 17, 35, 36,
   };
 
   memcpy (reg_alloc_order, TARGET_WINDOWED_ABI ?
@@ -5363,6 +5450,8 @@ hwloop_optimize (hwloop_info loop)
 
   end_sequence ();
 
+  xtensa_hoist_loop_sar (loop, insn);
+
   return true;
 }
 
@@ -5441,8 +5530,14 @@ xtensa_reorg (void)
 
   df_analyze ();
 
-  /* Doloop optimization.  */
+  xtensa_eliminate_redundant_sar_setups ();
+
+  /* Doloop optimization.  Hoisting inserts one setup before LOOP,
+     which can duplicate a setup already in that block.  */
   xtensa_reorg_loops ();
+
+  compute_bb_for_insn ();
+  xtensa_eliminate_redundant_sar_setups ();
 }
 
 /* Update register usage after having seen the compiler flags.  */
@@ -5478,7 +5573,8 @@ xtensa_conditional_register_usage (void)
     CLEAR_HARD_REG_BIT (reg_class_contents[RL_REGS], A0_REG);
 
   /* Generate the contents of the reverse-lookup array from the currently
-     active register class definitions.  */
+     active register class definitions.  SAR is fixed and belongs to no
+     allocatable class.  */
   for (i = 0; i < FIRST_PSEUDO_REGISTER; ++i)
     for (cl = NO_REGS + 1; cl < ALL_REGS; ++cl)
       if (TEST_HARD_REG_BIT (reg_class_contents[cl], i))
@@ -5487,9 +5583,12 @@ xtensa_conditional_register_usage (void)
 	  break;
 	}
 
+  xtensa_regno_to_class[SAR_REGNUM] = NO_REGS;
+
   /* Verify the generated mapping for any omissions.  */
   for (i = 0; i < FIRST_PSEUDO_REGISTER; ++i)
-    gcc_assert (xtensa_regno_to_class[i] != NO_REGS);
+    if (!SAR_REG_P (i))
+      gcc_assert (xtensa_regno_to_class[i] != NO_REGS);
 }
 
 /* Implement TARGET_CONSTANT_ALIGNMENT.  Align string constants and
@@ -5733,8 +5832,8 @@ xtensa_md_asm_adjust (vec<rtx> &outputs ATTRIBUTE_UNUSED,
 		      vec<machine_mode> &input_modes ATTRIBUTE_UNUSED,
 		      vec<const char *> &constraints,
 		      vec<rtx> &uses ATTRIBUTE_UNUSED,
-		      vec<rtx> &clobbers ATTRIBUTE_UNUSED,
-		      HARD_REG_SET &clobbered_regs ATTRIBUTE_UNUSED,
+		      vec<rtx> &clobbers,
+		      HARD_REG_SET &clobbered_regs,
 		      location_t loc ATTRIBUTE_UNUSED)
 {
   size_t n, l;
@@ -5773,6 +5872,10 @@ xtensa_md_asm_adjust (vec<rtx> &outputs ATTRIBUTE_UNUSED,
 		   "\"%s\".\n", constraint, modified);
 	constraint = modified;
       }
+
+  if (! TEST_HARD_REG_BIT (clobbered_regs, SAR_REGNUM))
+    clobbers.safe_push (gen_rtx_REG (SImode, SAR_REGNUM));
+  SET_HARD_REG_BIT (clobbered_regs, SAR_REGNUM);
 
   return NULL;
 }

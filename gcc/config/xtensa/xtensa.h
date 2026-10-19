@@ -210,9 +210,10 @@ along with GCC; see the file COPYING3.  If not see
    17		ARG_POINTER (fake = initial sp + framesize)
    18		BR[0] for floating-point CC
    19 - 34	FR[0] - FR[15]
-   35		MAC16 accumulator */
+   35		MAC16 accumulator
+   36		SAR shift amount register */
 
-#define FIRST_PSEUDO_REGISTER 36
+#define FIRST_PSEUDO_REGISTER 37
 
 /* Return the stabs register number to use for REGNO.  */
 #define DEBUGGER_REGNO(REGNO) xtensa_debugger_regno (REGNO)
@@ -224,7 +225,7 @@ along with GCC; see the file COPYING3.  If not see
   1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,			\
   1, 1, 0,								\
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,			\
-  0,									\
+  0, 1,									\
 }
 
 /* 1 for registers not available across function calls.
@@ -246,7 +247,7 @@ along with GCC; see the file COPYING3.  If not see
   1, 0, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1, 2, 2, 2, 2,			\
   0, 0, 1,								\
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,			\
-  1,									\
+  1, 1,									\
 }
 
 /* For the windowed register ABI on Xtensa processors, the allocation
@@ -259,7 +260,7 @@ along with GCC; see the file COPYING3.  If not see
 {									\
    8,  9, 10, 11, 12, 13, 14, 15,  7,  6,  5,  4,  3,  2, 18,		\
   19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,	\
-   0,  1, 16, 17, 35,							\
+   0,  1, 16, 17, 35, 36,						\
 }
 #define ADJUST_REG_ALLOC_ORDER xtensa_adjust_reg_alloc_order ()
 
@@ -285,10 +286,14 @@ along with GCC; see the file COPYING3.  If not see
 #define ACC_REG_FIRST	35
 #define ACC_REG_LAST	35
 
+/* Shift amount register */
+#define SAR_REGNUM 36
+
 #define GP_REG_P(REGNO)  (IN_RANGE ((REGNO), GP_REG_FIRST, GP_REG_LAST))
 #define BR_REG_P(REGNO)  (IN_RANGE ((REGNO), BR_REG_FIRST, BR_REG_LAST))
 #define FP_REG_P(REGNO)  (IN_RANGE ((REGNO), FP_REG_FIRST, FP_REG_LAST))
 #define ACC_REG_P(REGNO) (IN_RANGE ((REGNO), ACC_REG_FIRST, ACC_REG_LAST))
+#define SAR_REG_P(REGNO) ((REGNO) == SAR_REGNUM)
 
 /* Register to use for pushing function arguments.  */
 #define STACK_POINTER_REGNUM (GP_REG_FIRST + 1)
@@ -405,7 +410,7 @@ enum reg_class
   { 0x0000fffd, 0x00000000 }, /* preferred reload registers */ \
   { 0x0000fffd, 0x00000000 }, /* general-purpose registers */ \
   { 0x0003ffff, 0x00000000 }, /* integer registers */ \
-  { 0xffffffff, 0x0000000f }  /* all registers */ \
+  { 0xffffffff, 0x0000001f }  /* all registers */ \
 }
 
 /* A C expression whose value is a register class containing hard
@@ -674,7 +679,7 @@ typedef struct xtensa_args
   "fp",   "argp", "b0",							\
   "f0",   "f1",   "f2",   "f3",   "f4",   "f5",   "f6",   "f7",		\
   "f8",   "f9",   "f10",  "f11",  "f12",  "f13",  "f14",  "f15",	\
-  "acc"									\
+  "acc",  "sar"								\
 }
 
 /* If defined, a C initializer for an array of structures containing a

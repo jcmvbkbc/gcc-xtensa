@@ -25,6 +25,13 @@
   (A7_REG		7)
   (A8_REG		8)
   (A9_REG		9)
+  (SAR_REG		36)
+
+  (XTENSA_SAR_SSL	0)
+  (XTENSA_SAR_SSR	1)
+  (XTENSA_SAR_SSA8B	2)
+  (XTENSA_SAR_SSA8L	3)
+  (XTENSA_SAR_SSAI	4)
 ])
 
 (define_c_enum "unspec" [
@@ -44,6 +51,7 @@
   UNSPEC_CEIL
   UNSPEC_FLOOR
   UNSPEC_ROUND
+  UNSPEC_SAR_SETUP
 ])
 
 (define_c_enum "unspecv" [
@@ -711,14 +719,35 @@
   DONE;
 })
 
-(define_insn "bswapsi2_internal"
+(define_insn_and_split "bswapsi2_internal"
   [(set (match_operand:SI 0 "register_operand")
 	(bswap:SI (match_operand:SI 1 "register_operand")))
    (clobber (match_scratch:SI 2))]
   "!optimize_debug && optimize > 1 && !optimize_size"
   {@ [cons: =0, 1, =2; attrs: type, length]
-     [ a, 0, &a; arith, 15] << xtensa_bswapsi2_output (insn, "srli\t%2, %1, 16\;src\t%2, %2, %1\;src\t%2, %2, %2\;src\t%0, %1, %2");
-     [&a, r,  X; arith, 15] << xtensa_bswapsi2_output (insn, "srli\t%0, %1, 16\;src\t%0, %0, %1\;src\t%0, %0, %0\;src\t%0, %1, %0");
+     [ a, 0, &a; arith, 15] #
+     [&a, r,  X; arith, 15] #
+  }
+  "&& 1"
+  [(set (reg:SI SAR_REG)
+	(unspec:SI [(const_int 8) (const_int XTENSA_SAR_SSAI)]
+		   UNSPEC_SAR_SETUP))
+   (parallel
+     [(set (match_dup 0) (bswap:SI (match_dup 1)))
+      (clobber (match_dup 2))
+      (use (reg:SI SAR_REG))])]
+  ""
+  [(set_attr "mode" "SI")])
+
+(define_insn "*bswapsi2_internal_sar"
+  [(set (match_operand:SI 0 "register_operand")
+	(bswap:SI (match_operand:SI 1 "register_operand")))
+   (clobber (match_scratch:SI 2))
+   (use (reg:SI SAR_REG))]
+  "!optimize_debug && optimize > 1 && !optimize_size"
+  {@ [cons: =0, 1, =2; attrs: type, length]
+     [ a, 0, &a; arith, 12] srli\t%2, %1, 16\;src\t%2, %2, %1\;src\t%2, %2, %2\;src\t%0, %1, %2
+     [&a, r,  X; arith, 12] srli\t%0, %1, 16\;src\t%0, %0, %1\;src\t%0, %0, %0\;src\t%0, %1, %0
   }
   [(set_attr "mode" "SI")])
 
@@ -1722,16 +1751,35 @@
   operands[1] = xtensa_copy_incoming_a7 (operands[1]);
 })
 
-(define_insn "ashlsi3_internal"
+(define_insn_and_split "ashlsi3_internal"
   [(set (match_operand:SI 0 "register_operand")
 	(ashift:SI (match_operand:SI 1 "register_operand")
 		   (match_operand:SI 2 "arith_operand")))]
   ""
   {@ [cons: =0, 1, 2; attrs: type, length]
      [a, r, J; arith, 3] slli\t%0, %1, %R2
-     [a, r, r; arith, 6] ssl\t%2\;sll\t%0, %1
+     [a, r, r; arith, 6] #
   }
+  "&& register_operand (operands[2], SImode)"
+  [(set (reg:SI SAR_REG)
+	(unspec:SI [(match_dup 2) (const_int XTENSA_SAR_SSL)]
+		   UNSPEC_SAR_SETUP))
+   (parallel
+     [(set (match_dup 0) (ashift:SI (match_dup 1) (match_dup 2)))
+      (use (reg:SI SAR_REG))])]
+  ""
   [(set_attr "mode" "SI")])
+
+(define_insn "*ashlsi3_sar"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(ashift:SI (match_operand:SI 1 "register_operand" "r")
+		   (match_operand:SI 2 "register_operand" "r")))
+   (use (reg:SI SAR_REG))]
+  ""
+  "sll\t%0, %1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
 
 (define_split
   [(set (match_operand:SI 0 "register_operand")
@@ -1742,47 +1790,111 @@
 	(plus:SI (match_dup 1)
 		 (match_dup 1)))])
 
-(define_insn "ashrsi3"
+(define_insn_and_split "ashrsi3"
   [(set (match_operand:SI 0 "register_operand")
 	(ashiftrt:SI (match_operand:SI 1 "register_operand")
 		     (match_operand:SI 2 "arith_operand")))]
   ""
   {@ [cons: =0, 1, 2; attrs: type, length]
      [a, r, J; arith, 3] srai\t%0, %1, %R2
-     [a, r, r; arith, 6] ssr\t%2\;sra\t%0, %1
+     [a, r, r; arith, 6] #
   }
+  "&& register_operand (operands[2], SImode)"
+  [(set (reg:SI SAR_REG)
+	(unspec:SI [(match_dup 2) (const_int XTENSA_SAR_SSR)]
+		   UNSPEC_SAR_SETUP))
+   (parallel
+     [(set (match_dup 0) (ashiftrt:SI (match_dup 1) (match_dup 2)))
+      (use (reg:SI SAR_REG))])]
+  ""
   [(set_attr "mode" "SI")])
 
-(define_insn "lshrsi3"
+(define_insn "*ashrsi3_sar"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(ashiftrt:SI (match_operand:SI 1 "register_operand" "r")
+		     (match_operand:SI 2 "register_operand" "r")))
+   (use (reg:SI SAR_REG))]
+  ""
+  "sra\t%0, %1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
+
+(define_insn_and_split "lshrsi3"
   [(set (match_operand:SI 0 "register_operand")
 	(lshiftrt:SI (match_operand:SI 1 "register_operand")
 		     (match_operand:SI 2 "arith_operand")))]
   ""
   {@ [cons: =0, 1, 2; attrs: type, length]
      [a, r, J; arith, 3] << (INTVAL (operands[2]) & 0x1f) < 16 ? \"srli\t%0, %1, %R2\" : \"extui\t%0, %1, %R2, %L2\";
-     [a, r, r; arith, 6] ssr\t%2\;srl\t%0, %1
+     [a, r, r; arith, 6] #
   }
+  "&& register_operand (operands[2], SImode)"
+  [(set (reg:SI SAR_REG)
+	(unspec:SI [(match_dup 2) (const_int XTENSA_SAR_SSR)]
+		   UNSPEC_SAR_SETUP))
+   (parallel
+     [(set (match_dup 0) (lshiftrt:SI (match_dup 1) (match_dup 2)))
+      (use (reg:SI SAR_REG))])]
+  ""
   [(set_attr "mode" "SI")])
 
-(define_insn "*shift_per_byte"
+(define_insn "*lshrsi3_sar"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(lshiftrt:SI (match_operand:SI 1 "register_operand" "r")
+		     (match_operand:SI 2 "register_operand" "r")))
+   (use (reg:SI SAR_REG))]
+  ""
+  "srl\t%0, %1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
+
+(define_insn_and_split "*shift_per_byte"
   [(set (match_operand:SI 0 "register_operand" "=a")
 	(match_operator:SI 3 "xtensa_shift_per_byte_operator"
 		[(match_operand:SI 1 "register_operand" "r")
 		 (ashift:SI (match_operand:SI 2 "register_operand" "r")
 			    (const_int 3))]))]
   ""
+  "#"
+  "&& 1"
+  [(set (reg:SI SAR_REG)
+	(unspec:SI [(match_dup 2) (match_dup 4)] UNSPEC_SAR_SETUP))
+   (parallel
+     [(set (match_dup 0)
+	   (match_op_dup 3
+	     [(match_dup 1)
+	      (ashift:SI (match_dup 2) (const_int 3))]))
+      (use (reg:SI SAR_REG))])]
+{
+  operands[4] = GEN_INT (GET_CODE (operands[3]) == ASHIFT
+			 ? XTENSA_SAR_SSA8B : XTENSA_SAR_SSA8L);
+}
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"6")])
+
+(define_insn "*shift_per_byte_sar"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(match_operator:SI 3 "xtensa_shift_per_byte_operator"
+		[(match_operand:SI 1 "register_operand" "r")
+		 (ashift:SI (match_operand:SI 2 "register_operand" "r")
+			    (const_int 3))]))
+   (use (reg:SI SAR_REG))]
+  ""
 {
   switch (GET_CODE (operands[3]))
     {
-    case ASHIFT:	return "ssa8b\t%2\;sll\t%0, %1";
-    case ASHIFTRT:	return "ssa8l\t%2\;sra\t%0, %1";
-    case LSHIFTRT:	return "ssa8l\t%2\;srl\t%0, %1";
+    case ASHIFT:	return "sll\t%0, %1";
+    case ASHIFTRT:	return "sra\t%0, %1";
+    case LSHIFTRT:	return "srl\t%0, %1";
     default:		gcc_unreachable ();
     }
 }
   [(set_attr "type"	"arith")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"6")])
+   (set_attr "length"	"3")])
 
 (define_insn_and_split "*shift_per_byte_omit_AND_0"
   [(set (match_operand:SI 0 "register_operand" "=a")
@@ -1830,7 +1942,7 @@
    (set_attr "mode"	"SI")
    (set_attr "length"	"9")])
 
-(define_insn "*shlrd_reg"
+(define_insn_and_split "*shlrd_reg"
   [(set (match_operand:SI 0 "register_operand" "=a")
 	(match_operator:SI 6 "xtensa_bit_join_operator"
 		[(match_operator:SI 4 "logical_shift_operator"
@@ -1841,17 +1953,49 @@
 			 (neg:SI (match_dup 3))])]))]
   "!optimize_debug && optimize
    && xtensa_shlrd_which_direction (operands[4], operands[5]) != UNKNOWN"
+  "#"
+  "&& 1"
+  [(set (reg:SI SAR_REG)
+	(unspec:SI [(match_dup 3) (match_dup 7)] UNSPEC_SAR_SETUP))
+   (parallel
+     [(set (match_dup 0)
+	   (match_op_dup 6
+	     [(match_op_dup 4 [(match_dup 1) (match_dup 3)])
+	      (match_op_dup 5
+		[(match_dup 2) (neg:SI (match_dup 3))])]))
+      (use (reg:SI SAR_REG))])]
+{
+  operands[7]
+    = GEN_INT (xtensa_shlrd_which_direction (operands[4], operands[5])
+	       == ASHIFT ? XTENSA_SAR_SSL : XTENSA_SAR_SSR);
+}
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"6")])
+
+(define_insn "*shlrd_reg_sar"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(match_operator:SI 6 "xtensa_bit_join_operator"
+		[(match_operator:SI 4 "logical_shift_operator"
+			[(match_operand:SI 1 "register_operand" "r")
+			 (match_operand:SI 3 "register_operand" "r")])
+		 (match_operator:SI 5 "logical_shift_operator"
+			[(match_operand:SI 2 "register_operand" "r")
+			 (neg:SI (match_dup 3))])]))
+   (use (reg:SI SAR_REG))]
+  "!optimize_debug && optimize
+   && xtensa_shlrd_which_direction (operands[4], operands[5]) != UNKNOWN"
 {
   switch (xtensa_shlrd_which_direction (operands[4], operands[5]))
     {
-    case ASHIFT:	return "ssl\t%3\;src\t%0, %1, %2";
-    case LSHIFTRT:	return "ssr\t%3\;src\t%0, %2, %1";
+    case ASHIFT:	return "src\t%0, %1, %2";
+    case LSHIFTRT:	return "src\t%0, %2, %1";
     default:		gcc_unreachable ();
     }
 }
   [(set_attr "type"	"arith")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"6")])
+   (set_attr "length"	"3")])
 
 (define_insn_and_split "*shlrd_reg"
   [(set (match_operand:SI 0 "register_operand" "=a")
@@ -1880,7 +2024,7 @@
    (set_attr "length"	"6")])
 
 
-(define_insn "*shlrd_const"
+(define_insn_and_split "*shlrd_const"
   [(set (match_operand:SI 0 "register_operand" "=a")
 	(match_operator:SI 7 "xtensa_bit_join_operator"
 		[(match_operator:SI 5 "logical_shift_operator"
@@ -1894,19 +2038,55 @@
    && IN_RANGE (INTVAL (operands[3]), 1, 31)
    && IN_RANGE (INTVAL (operands[4]), 1, 31)
    && INTVAL (operands[3]) + INTVAL (operands[4]) == 32"
+  "#"
+  "&& 1"
+  [(set (reg:SI SAR_REG)
+	(unspec:SI [(match_dup 8) (const_int XTENSA_SAR_SSAI)]
+		   UNSPEC_SAR_SETUP))
+   (parallel
+     [(set (match_dup 0)
+	   (match_op_dup 7
+	     [(match_op_dup 5 [(match_dup 1) (match_dup 3)])
+	      (match_op_dup 6 [(match_dup 2) (match_dup 4)])]))
+      (use (reg:SI SAR_REG))])]
 {
-  switch (xtensa_shlrd_which_direction (operands[5], operands[6]))
-    {
-    case ASHIFT:	return "ssai\t%L3\;src\t%0, %1, %2";
-    case LSHIFTRT:	return "ssai\t%R3\;src\t%0, %2, %1";
-    default:		gcc_unreachable ();
-    }
+  operands[8]
+    = GEN_INT ((xtensa_shlrd_which_direction (operands[5], operands[6])
+		== ASHIFT ? 32 - INTVAL (operands[3])
+			  : INTVAL (operands[3])) & 31);
 }
   [(set_attr "type"	"arith")
    (set_attr "mode"	"SI")
    (set_attr "length"	"6")])
 
-(define_insn "*shlrd_per_byte"
+(define_insn "*shlrd_const_sar"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(match_operator:SI 7 "xtensa_bit_join_operator"
+		[(match_operator:SI 5 "logical_shift_operator"
+			[(match_operand:SI 1 "register_operand" "r")
+			 (match_operand:SI 3 "const_int_operand" "")])
+		 (match_operator:SI 6 "logical_shift_operator"
+			[(match_operand:SI 2 "register_operand" "r")
+			 (match_operand:SI 4 "const_int_operand" "")])]))
+   (use (reg:SI SAR_REG))]
+  "!optimize_debug && optimize
+   && xtensa_shlrd_which_direction (operands[5], operands[6]) != UNKNOWN
+   && IN_RANGE (INTVAL (operands[3]), 1, 31)
+   && IN_RANGE (INTVAL (operands[4]), 1, 31)
+   && INTVAL (operands[3]) + INTVAL (operands[4]) == 32"
+{
+  switch (xtensa_shlrd_which_direction (operands[5], operands[6]))
+    {
+    case ASHIFT:	return "src\t%0, %1, %2";
+    case LSHIFTRT:	return "src\t%0, %2, %1";
+    default:		gcc_unreachable ();
+    }
+}
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
+
+(define_insn_and_split "*shlrd_per_byte"
   [(set (match_operand:SI 0 "register_operand" "=a")
 	(match_operator:SI 6 "xtensa_bit_join_operator"
 		[(match_operator:SI 4 "logical_shift_operator"
@@ -1919,17 +2099,54 @@
 					    (const_int 3)))])]))]
   "!optimize_debug && optimize
    && xtensa_shlrd_which_direction (operands[4], operands[5]) != UNKNOWN"
+  "#"
+  "&& 1"
+  [(set (reg:SI SAR_REG)
+	(unspec:SI [(match_dup 2) (match_dup 7)] UNSPEC_SAR_SETUP))
+   (parallel
+     [(set (match_dup 0)
+	   (match_op_dup 6
+	     [(match_op_dup 4
+		[(match_dup 1)
+		 (ashift:SI (match_dup 2) (const_int 3))])
+	      (match_op_dup 5
+		[(match_dup 3)
+		 (neg:SI (ashift:SI (match_dup 2) (const_int 3)))])]))
+      (use (reg:SI SAR_REG))])]
+{
+  operands[7]
+    = GEN_INT (xtensa_shlrd_which_direction (operands[4], operands[5])
+	       == ASHIFT ? XTENSA_SAR_SSA8B : XTENSA_SAR_SSA8L);
+}
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"6")])
+
+(define_insn "*shlrd_per_byte_sar"
+  [(set (match_operand:SI 0 "register_operand" "=a")
+	(match_operator:SI 6 "xtensa_bit_join_operator"
+		[(match_operator:SI 4 "logical_shift_operator"
+			[(match_operand:SI 1 "register_operand" "r")
+			 (ashift:SI (match_operand:SI 2 "register_operand" "r")
+				    (const_int 3))])
+		 (match_operator:SI 5 "logical_shift_operator"
+			[(match_operand:SI 3 "register_operand" "r")
+			 (neg:SI (ashift:SI (match_dup 2)
+					    (const_int 3)))])]))
+   (use (reg:SI SAR_REG))]
+  "!optimize_debug && optimize
+   && xtensa_shlrd_which_direction (operands[4], operands[5]) != UNKNOWN"
 {
   switch (xtensa_shlrd_which_direction (operands[4], operands[5]))
     {
-    case ASHIFT:	return "ssa8b\t%2\;src\t%0, %1, %3";
-    case LSHIFTRT:	return "ssa8l\t%2\;src\t%0, %3, %1";
+    case ASHIFT:	return "src\t%0, %1, %3";
+    case LSHIFTRT:	return "src\t%0, %3, %1";
     default:		gcc_unreachable ();
     }
 }
   [(set_attr "type"	"arith")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"6")])
+   (set_attr "length"	"3")])
 
 (define_insn_and_split "*shlrd_per_byte_omit_AND"
   [(set (match_operand:SI 0 "register_operand" "=a")
@@ -1964,27 +2181,116 @@
    (set_attr "mode"	"SI")
    (set_attr "length"	"6")])
 
-(define_insn "rotlsi3"
+(define_insn_and_split "rotlsi3"
   [(set (match_operand:SI 0 "register_operand")
 	(rotate:SI (match_operand:SI 1 "register_operand")
 		     (match_operand:SI 2 "arith_operand")))]
   ""
   {@ [cons: =0, 1, 2; attrs: type, length]
-     [a, r, J; multi, 6] ssai\t%L2\;src\t%0, %1, %1
-     [a, r, r; multi, 6] ssl\t%2\;src\t%0, %1, %1
+     [a, r, J; multi, 6] #
+     [a, r, r; multi, 6] #
   }
+  "&& 1"
+  [(set (reg:SI SAR_REG)
+	(unspec:SI [(match_dup 4) (match_dup 3)] UNSPEC_SAR_SETUP))
+   (parallel
+     [(set (match_dup 0) (rotate:SI (match_dup 1) (match_dup 2)))
+      (use (reg:SI SAR_REG))])]
+{
+  if (CONST_INT_P (operands[2]))
+    {
+      operands[3] = GEN_INT (XTENSA_SAR_SSAI);
+      operands[4] = GEN_INT ((32 - INTVAL (operands[2])) & 31);
+    }
+  else
+    {
+      operands[3] = GEN_INT (XTENSA_SAR_SSL);
+      operands[4] = operands[2];
+    }
+}
   [(set_attr "mode" "SI")])
 
-(define_insn "rotrsi3"
+(define_insn "*rotlsi3_sar"
+  [(set (match_operand:SI 0 "register_operand" "=a,a")
+	(rotate:SI (match_operand:SI 1 "register_operand" "r,r")
+		   (match_operand:SI 2 "arith_operand" "J,r")))
+   (use (reg:SI SAR_REG))]
+  ""
+  "src\t%0, %1, %1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
+
+(define_insn_and_split "rotrsi3"
   [(set (match_operand:SI 0 "register_operand")
 	(rotatert:SI (match_operand:SI 1 "register_operand")
 		     (match_operand:SI 2 "arith_operand")))]
   ""
   {@ [cons: =0, 1, 2; attrs: type, length]
-     [a, r, J; multi, 6] ssai\t%R2\;src\t%0, %1, %1
-     [a, r, r; multi, 6] ssr\t%2\;src\t%0, %1, %1
+     [a, r, J; multi, 6] #
+     [a, r, r; multi, 6] #
   }
+  "&& 1"
+  [(set (reg:SI SAR_REG)
+	(unspec:SI [(match_dup 4) (match_dup 3)] UNSPEC_SAR_SETUP))
+   (parallel
+     [(set (match_dup 0) (rotatert:SI (match_dup 1) (match_dup 2)))
+      (use (reg:SI SAR_REG))])]
+{
+  if (CONST_INT_P (operands[2]))
+    {
+      operands[3] = GEN_INT (XTENSA_SAR_SSAI);
+      operands[4] = GEN_INT (INTVAL (operands[2]) & 31);
+    }
+  else
+    {
+      operands[3] = GEN_INT (XTENSA_SAR_SSR);
+      operands[4] = operands[2];
+    }
+}
   [(set_attr "mode" "SI")])
+
+(define_insn "*rotrsi3_sar"
+  [(set (match_operand:SI 0 "register_operand" "=a,a")
+	(rotatert:SI (match_operand:SI 1 "register_operand" "r,r")
+		     (match_operand:SI 2 "arith_operand" "J,r")))
+   (use (reg:SI SAR_REG))]
+  ""
+  "src\t%0, %1, %1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
+
+;; Explicitly set SAR.  Operand 0 is the shift amount and operand 1 is
+;; the setup kind (XTENSA_SAR_*).
+;;
+;; SSAI is immediate-only.  A register constraint would let postreload
+;; replace the constant with a hard reg known to hold the same value,
+;; and %R cannot print that.
+
+(define_insn "xtensa_sar_setup"
+  [(set (reg:SI SAR_REG)
+	(unspec:SI [(match_operand:SI 0 "register_operand" "r")
+		    (match_operand:SI 1 "const_int_operand" "")]
+		   UNSPEC_SAR_SETUP))]
+  "INTVAL (operands[1]) != XTENSA_SAR_SSAI"
+{
+  return xtensa_output_sar_setup_insn (operands);
+}
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
+
+(define_insn "xtensa_sar_setupi"
+  [(set (reg:SI SAR_REG)
+	(unspec:SI [(match_operand:SI 0 "const_int_operand" "i")
+		    (match_operand:SI 1 "const_int_operand" "")]
+		   UNSPEC_SAR_SETUP))]
+  "INTVAL (operands[1]) == XTENSA_SAR_SSAI"
+  "ssai\t%R0"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")
+   (set_attr "length"	"3")])
 
 
 ;; Comparisons.

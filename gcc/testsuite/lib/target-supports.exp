@@ -15089,6 +15089,34 @@ proc check_effective_target_xtensa_atomic { } {
     }]
 }
 
+
+# Return 1 if the Xtensa core has the MAC16 option.
+proc check_effective_target_xtensa_mac16 { } {
+    return [check_no_compiler_messages xtensa_mac16 assembly {
+	#if __XCHAL_HAVE_MAC16 != 1
+	#error FOO
+	#endif
+    }]
+}
+
+# Return 1 if the Xtensa core has the MUL16 option.
+proc check_effective_target_xtensa_mul16 { } {
+    return [check_no_compiler_messages xtensa_mul16 assembly {
+	#if __XCHAL_HAVE_MUL16 != 1
+	#error FOO
+	#endif
+    }]
+}
+
+# Return 1 if the Xtensa core has zero-overhead loops.
+proc check_effective_target_xtensa_loops { } {
+    return [check_no_compiler_messages xtensa_loops assembly {
+	#if __XCHAL_HAVE_LOOPS != 1
+	#error FOO
+	#endif
+    }]
+}
+
 # Return 1 if pi-based trigonometry function is foldable
 # We should remove this after bumping the minimum mpfr version to 4.2.0.
 proc check_effective_target_foldable_pi_based_trigonometry { } {
