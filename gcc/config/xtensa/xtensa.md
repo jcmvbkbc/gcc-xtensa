@@ -1664,7 +1664,7 @@
      [f,  U; fload , 3] %v1ldi\t%0, %1
      [U,  f; fstore, 3] %v0sdi\t%1, %0
      [a,  r; move  , 6] df-move-a-from-r\t%0, %1
-     [a,  Y; load  , 6] df-load-a-from-Y\t%0, %1
+     [a,  Y; load  , 6] df-load-a-from-Y\t%0
      [a,  T; load  , 6] df-load-a-from-T\t%0, %1
      [a,  U; load  , 6] df-load-a-from-U\t%0, %1
      [U,  r; store , 6] df-store-r-to-U\t%0, %1
@@ -1674,7 +1674,8 @@
    (set (match_dup 1) (match_dup 3))]
 {
   if ((register_operand (operands[0], DFmode)
-       && (FP_REG_P (REGNO (operands[0])) || CONSTANT_P (operands[1])))
+       && (FP_REG_P (REGNO (operands[0]))
+	   || satisfies_constraint_Gz (operands[1])))
       || (register_operand (operands[1], DFmode)
 	  && FP_REG_P (REGNO (operands[1]))))
     FAIL;
