@@ -140,6 +140,7 @@ static int xtensa_insn_cost (rtx_insn *, bool);
 static int xtensa_register_move_cost (machine_mode, reg_class_t,
 				      reg_class_t);
 static tree xtensa_build_builtin_va_list (void);
+static bool xtensa_bitint_type_info (int n, struct bitint_info *info);
 static bool xtensa_return_in_memory (const_tree, const_tree);
 static tree xtensa_gimplify_va_arg_expr (tree, tree, gimple_seq *,
 					 gimple_seq *);
@@ -246,6 +247,9 @@ static tree xtensa_handle_force_l32_attribute (tree *, tree, tree, int, bool *);
 
 #undef TARGET_EXPAND_BUILTIN_VA_START
 #define TARGET_EXPAND_BUILTIN_VA_START xtensa_va_start
+
+#undef TARGET_C_BITINT_TYPE_INFO
+#define TARGET_C_BITINT_TYPE_INFO xtensa_bitint_type_info
 
 #undef TARGET_PROMOTE_FUNCTION_MODE
 #define TARGET_PROMOTE_FUNCTION_MODE \
@@ -4993,6 +4997,30 @@ xtensa_insn_cost (rtx_insn *insn, bool speed)
 
   /* Fall back.  */
   return pattern_cost (PATTERN (insn), speed);
+}
+
+static bool
+xtensa_bitint_type_info (int n, struct bitint_info *info)
+{
+  if (n <= 8)
+    info->limb_mode = QImode;
+  else if (n <= 16)
+    info->limb_mode = HImode;
+  else if (n <= 32)
+    info->limb_mode = SImode;
+  else if (n <= 64)
+    info->limb_mode = DImode;
+  else
+    info->limb_mode = SImode;
+
+  if (n > 64)
+    info->abi_limb_mode = DImode;
+  else
+    info->abi_limb_mode = info->limb_mode;
+  info->big_endian = BYTES_BIG_ENDIAN;
+  info->extended = bitint_ext_partial;
+
+  return true;
 }
 
 /* Worker function for TARGET_RETURN_IN_MEMORY.  */
