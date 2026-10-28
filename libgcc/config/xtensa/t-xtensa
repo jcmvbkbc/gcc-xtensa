@@ -13,4 +13,11 @@ LIB1ASMFUNCS = _mulsi3 _divsi3 _modsi3 _udivsi3 _umodsi3 \
 	_truncdfsf2 _extendsfdf2 \
 	_sqrt _recipdf2 _rsqrtdf2
 
-LIB2ADD = $(srcdir)/config/xtensa/lib2funcs.S
+softfp_floatbitint_funcs = fix$(m)bitint floatbitint$(m)
+softfp_bitint_func_list :=  \
+  $(foreach m,sf df,$(softfp_floatbitint_funcs)) \
+  $(bitint_extras)
+softfp_file_list += \
+  $(addsuffix .c,$(addprefix $(srcdir)/soft-fp/,$(softfp_bitint_func_list)))
+
+LIB2ADD = $(srcdir)/config/xtensa/lib2funcs.S $(softfp_file_list)
