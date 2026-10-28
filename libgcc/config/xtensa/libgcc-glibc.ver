@@ -1,3 +1,13 @@
 GCC_4.3.0 {
   __umulsidi3
 }
+
+%inherit GCC_17.0.0 GCC_4.3.0
+GCC_17.0.0 {
+  __mulbitint3
+  __divmodbitint4
+  __fixsfbitint
+  __fixdfbitint
+  __floatbitintsf
+  __floatbitintdf
+}
