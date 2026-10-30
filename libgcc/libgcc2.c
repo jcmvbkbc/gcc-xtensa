@@ -1802,7 +1802,7 @@ __divmodbitint4 (UBILtype *q, SItype qprec,
 
   /* Knuth's algorithm.  See also ../gcc/wide-int.cc (divmod_internal_2).  */
 
-#ifndef UDIV_NEEDS_NORMALIZATION
+#if !UDIV_NEEDS_NORMALIZATION
   /* Handle single limb divisor first.  */
   if (vn == 1)
     {
@@ -1823,7 +1823,7 @@ __divmodbitint4 (UBILtype *q, SItype qprec,
 #endif
     {
       SItype s;
-#ifdef UDIV_NEEDS_NORMALIZATION
+#if UDIV_NEEDS_NORMALIZATION
       if (vn == 1 && v2[0] == 0)
 	s = 0;
       else
@@ -1857,7 +1857,7 @@ __divmodbitint4 (UBILtype *q, SItype qprec,
 	}
       else
 	u2[BITINT_END (0, un)] = 0;
-#ifdef UDIV_NEEDS_NORMALIZATION
+#if UDIV_NEEDS_NORMALIZATION
       /* Handle single limb divisor first.  */
       if (vn == 1)
 	{
