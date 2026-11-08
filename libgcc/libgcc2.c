@@ -1695,6 +1695,13 @@ __divmodbitint4 (UBILtype *q, SItype qprec,
 		 const UBILtype *u, SItype uprec,
 		 const UBILtype *v, SItype vprec)
 {
+#if 0
+  printf("before:\n");
+  printf("q = %p, qprec = %d\n", q, qprec);
+  printf("r = %p, rprec = %d\n", r, rprec);
+  printf("u = %p [%#010x], uprec = %d\n", u, u[0], uprec);
+  printf("v = %p [%#010x], vprec = %d\n", v, v[0], vprec);
+#endif
   uprec = bitint_reduce_prec (&u, uprec);
   vprec = bitint_reduce_prec (&v, vprec);
   USItype auprec = uprec < 0 ? -uprec : uprec;
@@ -1705,6 +1712,14 @@ __divmodbitint4 (UBILtype *q, SItype qprec,
   USItype rn = ((USItype) rprec + W_TYPE_SIZE - 1) / W_TYPE_SIZE;
   USItype up = auprec % W_TYPE_SIZE;
   USItype vp = avprec % W_TYPE_SIZE;
+#if 0
+  printf("before:\n");
+  printf("q = %p, qprec = %d\n", q, qprec);
+  printf("r = %p, rprec = %d\n", r, rprec);
+  printf("u = %p [%#010x], uprec = %d\n", u, u[0], uprec);
+  printf("v = %p [%#010x], vprec = %d\n", v, v[0], vprec);
+#endif
+
   /* If vprec < 0 and the top limb of v is all ones and the second most
      significant limb has most significant bit clear, then just decrease
      vn/avprec/vp, because after negation otherwise v2 would have most
